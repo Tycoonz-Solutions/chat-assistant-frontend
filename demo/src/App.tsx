@@ -58,7 +58,7 @@ function App() {
 
   return (
     <div style={{ padding: 30 }}>
-      <ChatWidget title="Help" faqs={demoFaqs} />
+      <ChatWidget title="Help by chatbot" faqs={demoFaqs}  />
     </div>
   );
 }

@@ -1,16 +1,12 @@
+// components/chat-widget/ChatWidget.tsx
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
-import { X, MessageCircle, Send, ChevronRight, ArrowLeft, List } from 'lucide-react';
-
-type FAQ = { question: string; ans: string };
-
-export interface ChatFAQWidgetProps {
-  title?: string;
-  faqs: FAQ[];
-  placeholder?: string;
-  sendMessage?: (msg: string) => Promise<string> | string;
-}
+import React, { useEffect, useRef, useState } from 'react';
+import FloatingButton from './components/FloatingButton';
+import WelcomeScreen from './components/WelcomeScreen';
+import ChatScreen from './components/ChatScreen';
+import LoginForm from './components/LoginForm';
+import { FAQ, Msg, ChatFAQWidgetProps, ThemeSettings } from '../types/index';
 
 export default function ChatWidget({
   title = 'AI Chatbot',
@@ -18,11 +14,19 @@ export default function ChatWidget({
   placeholder = 'Type message here...',
   sendMessage,
 }: ChatFAQWidgetProps) {
+  // --- state & refs (same as original) ---
   const [open, setOpen] = useState(false);
-  const [showChat, setShowChat] = useState(false);
-  const [messages, setMessages] = useState<{ role: 'user' | 'bot'; text: string }[]>([]);
+  const [view, setView] = useState<'welcome' | 'chat' | 'login'>('welcome');
+  const [messages, setMessages] = useState<Msg[]>([]);
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(false);
+  const [themeSettings, setThemeSettings] = useState<ThemeSettings>({
+    isDarkMode: false,
+    primaryColor: '#006D77',
+    secondaryColor: '#006D7738',
+    fontSizeBase: 28,
+    isGradient: false,
+  });
   const panelRef = useRef<HTMLDivElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
@@ -32,7 +36,7 @@ export default function ChatWidget({
       if (!panelRef.current) return;
       if (!panelRef.current.contains(e.target as Node)) {
         setOpen(false);
-        setTimeout(() => setShowChat(false), 300);
+        setTimeout(() => setView('chat'), 300);
       }
     }
     document.addEventListener('mousedown', onDocClick);
@@ -43,10 +47,14 @@ export default function ChatWidget({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  const nowTime = () =>
+    new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  // message handlers (kept same logic)
   async function handleSend(e?: React.FormEvent) {
     e?.preventDefault();
     if (!text.trim() || loading) return;
-    const userMsg = { role: 'user' as const, text: text.trim() };
+    const userMsg: Msg = { role: 'user', text: text.trim(), time: nowTime() };
     setMessages((m) => [...m, userMsg]);
     setText('');
     setLoading(true);
@@ -63,17 +71,21 @@ export default function ChatWidget({
           faqs.find((f) => q.includes(f.question.toLowerCase()));
         reply = match ? match.ans : "Sorry, I don't have an answer for that.";
       }
-      setMessages((m) => [...m, { role: 'bot', text: reply }]);
+      const botMsg: Msg = { role: 'bot', text: reply, time: nowTime() };
+      setMessages((m) => [...m, botMsg]);
     } catch (err: any) {
-      setMessages((m) => [...m, { role: 'bot', text: `Error: ${err?.message ?? String(err)}` }]);
+      setMessages((m) => [
+        ...m,
+        { role: 'bot', text: `Error: ${err?.message ?? String(err)}`, time: nowTime() },
+      ]);
     } finally {
       setLoading(false);
     }
   }
 
   async function handleSelectFAQ(f: FAQ) {
-    setShowChat(true);
-    const userMsg = { role: 'user' as const, text: f.question };
+    setView('chat');
+    const userMsg: Msg = { role: 'user', text: f.question, time: nowTime() };
     setMessages((m) => [...m, userMsg]);
     setLoading(true);
 
@@ -86,9 +98,13 @@ export default function ChatWidget({
         } else {
           reply = f.ans;
         }
-        setMessages((m) => [...m, { role: 'bot', text: reply }]);
+        const botMsg: Msg = { role: 'bot', text: reply, time: nowTime() };
+        setMessages((m) => [...m, botMsg]);
       } catch (err: any) {
-        setMessages((m) => [...m, { role: 'bot', text: `Error: ${err?.message ?? String(err)}` }]);
+        setMessages((m) => [
+          ...m,
+          { role: 'bot', text: `Error: ${err?.message ?? String(err)}`, time: nowTime() },
+        ]);
       } finally {
         setLoading(false);
       }
@@ -96,9 +112,40 @@ export default function ChatWidget({
   }
 
   function handleBackToFAQs() {
-    setShowChat(false);
+    setView('welcome');
   }
 
+  // simple contact form state (for login view)
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [query, setQuery] = useState('');
+  const [sending, setSending] = useState(false);
+
+  async function submit(e?: React.FormEvent) {
+    e?.preventDefault();
+    if (!email.trim() || !query.trim()) return;
+    setSending(true);
+    setTimeout(() => {
+      console.log('contact form submitted', { name, email, query });
+      setSending(false);
+      setView('chat');
+    }, 700);
+  }
+
+
+
+  function hexToRgb(hex: string) {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `${r}, ${g}, ${b}`;
+  }
+
+
+
+  const INPUT_AREA_ESTIMATED_HEIGHT = 84; // px — used to reserve space at bottom of messages
+
+  // --- Styles object (kept here in main file only) ---
   const styles = {
     floatingButton: {
       position: 'fixed' as const,
@@ -107,13 +154,17 @@ export default function ChatWidget({
       height: 64,
       width: 64,
       borderRadius: '50%',
-      background: '#006D77',
-      color: 'white',
+      background: themeSettings.isGradient
+        ? `linear-gradient(90deg, ${themeSettings.primaryColor}, ${themeSettings.secondaryColor})`
+        : themeSettings.primaryColor ?? '#776b00ff', color: 'white',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       border: 'none',
-      boxShadow: '0 8px 24px rgba(13, 115, 119, 0.4)',
+      boxShadow: `0 8px 24px ${themeSettings.isGradient
+        ? themeSettings.secondaryColor || themeSettings.primaryColor
+        : themeSettings.primaryColor
+        }`,
       cursor: 'pointer',
       zIndex: 1000,
       transition: 'all 0.3s ease',
@@ -126,7 +177,7 @@ export default function ChatWidget({
       height: 650,
       maxWidth: '95vw',
       maxHeight: '80vh',
-      background: '#ffffff',
+      background: themeSettings?.isDarkMode ? '#2b2b2b' : '#f8f8f8',
       borderRadius: 20,
       boxShadow: '0 20px 60px rgba(0, 0, 0, 0.2)',
       overflow: 'hidden',
@@ -143,7 +194,9 @@ export default function ChatWidget({
       alignItems: 'center',
       justifyContent: 'space-between',
       padding: '20px 24px',
-      background: '#006D77',
+      background: themeSettings.isGradient
+        ? `linear-gradient(90deg, ${themeSettings.primaryColor}, ${themeSettings.secondaryColor})`
+        : themeSettings.primaryColor ?? '#776b00ff',
       color: 'white',
     },
     welcomeScreen: {
@@ -151,87 +204,97 @@ export default function ChatWidget({
       display: 'flex',
       flexDirection: 'column' as const,
       overflow: 'hidden',
-      justifyContent: 'start', // centers vertically
-      alignItems: 'center',     // centers horizontally
-
+      justifyContent: 'start',
+      alignItems: 'center',
     },
     welcomeHeader: {
-      background: 'linear-gradient(135deg, #006D77 0%, #14919b 100%)',
-      padding: '40px 24px',
+      background: themeSettings.isGradient
+        ? `linear-gradient(90deg, ${themeSettings.primaryColor}, ${themeSettings.secondaryColor})`
+        : themeSettings.primaryColor ?? '#776b00ff', padding: '40px 24px',
       color: 'white',
       position: 'relative' as const,
       overflow: 'hidden',
-      width: "90%"
+      width: '90%',
     },
     faqContainer: {
       flex: 1,
       overflowY: 'auto' as const,
       padding: '24px',
-      background: '#fff',
-      borderRadius: "10px",
-      border:'1px solid #c4c4c4ff'
+      background: themeSettings?.isDarkMode ? '#2b2b2b' : '#f8f8f8',
+      borderRadius: '10px',
+      border: `1px solid ${themeSettings.isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}`,
     },
     faqCard: {
-      background: 'white',
+      background: themeSettings?.isDarkMode ? '#2b2b2b' : '#fff',
       borderRadius: 12,
       marginBottom: 12,
-      overflow: 'hidden',
-      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
+      boxShadow: themeSettings?.isDarkMode ? '0 2px 8px rgba(0, 0, 0, 0.2)' : '0 2px 8px rgba(0, 0, 0, 0.1)',
       transition: 'all 0.3s ease',
     },
     chatScreen: {
       flex: 1,
       display: 'flex',
       flexDirection: 'column' as const,
-      background: '#f0f2f5',
+      background: themeSettings?.isDarkMode ? '#2b2b2b' : '#f8f8f8',
+      minHeight: 0,
     },
     messagesArea: {
       flex: 1,
       overflowY: 'auto' as const,
-      padding: 20,
+      padding: `20px 20px ${INPUT_AREA_ESTIMATED_HEIGHT + 12}px 20px`,
       display: 'flex',
       flexDirection: 'column' as const,
       gap: 12,
+      minHeight: 0,
     },
-    userMessage: {
-      alignSelf: 'flex-end' as const,
-      background: '#006D77',
+    userMessageBubble: {
+      background: themeSettings.isGradient
+        ? `linear-gradient(90deg, ${themeSettings.primaryColor}, ${themeSettings.secondaryColor})`
+        : themeSettings.primaryColor ?? '#776b00ff',
       color: 'white',
       padding: '12px 16px',
       borderRadius: '16px 16px 4px 16px',
       maxWidth: '75%',
       wordWrap: 'break-word' as const,
-      fontSize: 14,
+      fontSize: themeSettings?.fontSizeBase ? themeSettings?.fontSizeBase / 2 + 4 : 16,
       lineHeight: 1.5,
       animation: 'slideInRight 0.3s ease',
     },
-    botMessage: {
-      alignSelf: 'flex-start' as const,
-      background: '#d1e7e8',
+    botMessageBubble: {
+      background: themeSettings.isGradient
+        ? `rgba(${hexToRgb(themeSettings.primaryColor)}, 0.6)`
+        : themeSettings.secondaryColor ?? '#776b00ff',
       color: '#1a1a1a',
       padding: '12px 16px',
       borderRadius: '16px 16px 16px 4px',
       maxWidth: '75%',
       wordWrap: 'break-word' as const,
-      fontSize: 14,
+      fontSize: themeSettings?.fontSizeBase ? themeSettings?.fontSizeBase / 2 + 4 : 14,
       lineHeight: 1.5,
       animation: 'slideInLeft 0.3s ease',
+    },
+    timeText: {
+      fontSize: 11,
+      opacity: 0.6,
+      marginTop: 6,
+      color: themeSettings?.isDarkMode ? '#fff' : '#0000',
     },
     inputArea: {
       padding: '16px 20px',
       position: 'absolute' as const,
       bottom: 0,
-      background: 'white',
-      borderTop: '1px solid #e0e0e0',
-      width: "93%"
+      background: themeSettings?.isDarkMode ? '#2b2b2b' : '#f8f8f8',
+      borderTop: `1px solid ${themeSettings.isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}`,
+      width: '93%',
     },
     inputWrapper: {
       display: 'flex',
       gap: 12,
       alignItems: 'center',
-      background: '#f0f2f5',
+      background: themeSettings?.isDarkMode ? '#333' : '#fff',
       borderRadius: 24,
       padding: '8px 12px',
+      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
     },
     input: {
       flex: 1,
@@ -240,350 +303,141 @@ export default function ChatWidget({
       outline: 'none',
       fontSize: 14,
       padding: '8px 12px',
-      color: '#1a1a1a',
+      width: '0%',
+      color: themeSettings?.isDarkMode ? '#fff' : '#1a1a1a',
     },
     sendButton: {
-      background: '#006D77',
-      color: 'white',
+      background: themeSettings.isGradient
+        ? `linear-gradient(90deg, ${themeSettings.primaryColor}, ${themeSettings.secondaryColor})`
+        : themeSettings.primaryColor ?? '#776b00ff', color: 'white',
       border: 'none',
-      borderRadius: '50%',
-      width: 40,
-      height: 40,
+      borderRadius: '36px',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
+      gap: 6,
       cursor: 'pointer',
       transition: 'all 0.2s ease',
       flexShrink: 0,
+      fontSize: 14,
+      padding: '8px 16px',
     },
-  };
+    formLabel: {
+      display: 'block',
+      fontSize: themeSettings?.fontSizeBase ? themeSettings?.fontSizeBase / 2 : 14,
+      fontWeight: 500,
+      marginBottom: 4,
+      color: themeSettings?.isDarkMode ? "#fff" : '#1a1a1a',
+    },
+    formInput: {
+      width: '100%',
+      border: `1px solid ${themeSettings.isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}`,
+      borderRadius: 8,
+      padding: '10px 12px',
+      fontSize: themeSettings?.fontSizeBase ? themeSettings?.fontSizeBase / 2 : 12,
+      outline: 'none',
+      boxSizing: 'border-box' as const,
+      background: themeSettings?.isDarkMode ? '#2b2b2b' : '#fff',
+      color: themeSettings?.isDarkMode ? "#fff" : '#1a1a1a',
+    },
+    formTextarea: {
+      width: '100%',
+      border: `1px solid ${themeSettings.isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}`,
+      borderRadius: 8,
+      padding: '10px 12px',
+      fontSize: 12,
+      outline: 'none',
+      boxSizing: 'border-box' as const,
+      height: 96,
+      resize: 'vertical' as const,
+      background: themeSettings?.isDarkMode ? '#2b2b2b' : '#fff',
+      color: themeSettings?.isDarkMode ? "#fff" : '#1a1a1a',
+    },
+    sendPill: {
+      background: themeSettings.isGradient
+        ? `linear-gradient(90deg, ${themeSettings.primaryColor}, ${themeSettings.secondaryColor})`
+        : themeSettings.primaryColor ?? '#776b00ff',
+      color: 'white',
+      border: 'none',
+      borderRadius: 36,
+      padding: '10px 30px',
+      fontSize: 14,
+      fontWeight: 500,
+      cursor: 'pointer',
+      transition: 'all 0.2s ease',
+    },
+  } as const;
 
   return (
     <>
       <style>{`
-      .hide-scrollbar {
-          scrollbar-width: none;      
-          -ms-overflow-style: none;    
-        }
-        .hide-scrollbar::-webkit-scrollbar {
-          display: none;              
-        }
-        @keyframes slideInRight {
-          from {
-            opacity: 0;
-            transform: translateX(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateX(0);
-          }
-        }
-        @keyframes slideInLeft {
-          from {
-            opacity: 0;
-            transform: translateX(-20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateX(0);
-          }
-        }
-        @keyframes pulse {
-          0%, 100% {
-            transform: scale(1);
-            opacity: 1;
-          }
-          50% {
-            transform: scale(1.1);
-            opacity: 0.8;
-          }
-        }
+        .hide-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .message-row { display:flex; align-items:flex-end; gap:8px; }
+        .message-row.user { justify-content:flex-end; }
+        .message-row.bot { justify-content:flex-start; }
+        .bot-avatar { width:36px; height:36px; border-radius:50%; flex-shrink:0; overflow:hidden; }
+        .bot-avatar img { width:100%; height:100%; object-fit:cover; display:block; }
+        .message-content { display:flex; flex-direction:column; align-items:flex-start; }
+        .message-content.user { align-items:flex-end; }
+        @keyframes slideInRight { from{ opacity:0; transform:translateX(20px);} to{ opacity:1; transform:translateX(0);} }
+        @keyframes slideInLeft  { from{ opacity:0; transform:translateX(-20px);} to{ opacity:1; transform:translateX(0);} }
+        @keyframes pulse { 0%,100%{ transform:scale(1); opacity:1;} 50%{ transform:scale(1.1); opacity:0.8;} }
+        @media (max-width: 600px) {.chat-panel { right: 8px !important;}}
       `}</style>
 
-      <button
-        style={styles.floatingButton}
-        onClick={() => setOpen((s) => !s)}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.transform = 'scale(1.1)';
-          e.currentTarget.style.boxShadow = '0 12px 32px rgba(13, 115, 119, 0.5)';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.transform = 'scale(1)';
-          e.currentTarget.style.boxShadow = '0 8px 24px rgba(13, 115, 119, 0.4)';
-        }}
-      >
-        {open ? <X size={28} /> : <MessageCircle size={28} />}
-      </button>
+      <FloatingButton
+        open={open}
+        setOpen={setOpen}
+        styles={styles}
+        themeSettings={themeSettings}
+      />
 
-      <div ref={panelRef} style={styles.panel}>
-        {!showChat ? (
-          <div style={styles.welcomeScreen}>
-            <div style={styles.welcomeHeader}>
+      <div ref={panelRef} style={styles.panel} className='chat-panel'>
+        {view === 'welcome' && (
+          <WelcomeScreen
+            styles={styles}
+            faqs={faqs}
+            onSelectFAQ={handleSelectFAQ}
+            placeholder={placeholder}
+            text={text}
+            setText={setText}
+            onSend={(e) => { e.preventDefault(); setView('chat'); handleSend(e); }}
+            themeSettings={themeSettings}
+          />
+        )}
 
+        {view === 'chat' && (
+          <ChatScreen
+            styles={styles}
+            title={title}
+            messages={messages}
+            loading={loading}
+            text={text}
+            setText={setText}
+            onSend={handleSend}
+            onBack={handleBackToFAQs}
+            messagesEndRef={messagesEndRef as unknown as React.RefObject<HTMLDivElement>}
+            themeSettings={themeSettings}
 
-              <div style={{ position: 'relative', zIndex: 1 }}>
-                <h2 style={{ margin: 0, fontSize: 28, fontWeight: 700, marginBottom: 8 }}>
-                  Hi there!
-                </h2>
-                <p style={{ margin: 0, fontSize: 14, opacity: 0.95, lineHeight: 1.5 }}>
-                  AI chat powered by our team - how can we assist you today?
-                </p>
-              </div>
-            </div>
+          />
+        )}
 
-            <div style={{
-              marginTop: '-30px',
-              maxHeight: '404px',
-              display: 'flex',
-              flexDirection: 'column' as const,
-              zIndex: 9,
-              flexGrow: 1,
-              flexShrink: 1,
-              flexBasis: '0%',
-              width: '90%',
-            }}>
-
-
-              <div style={styles.faqContainer} className="hide-scrollbar">
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  marginBottom: 16,
-                  padding: '0 4px',
-                }}>
-                  <List size={20} color="#006D77" />
-                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: '#1a1a1a' }}>
-                    Quick FAQs
-                  </h3>
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  {faqs.map((faq, index) => (
-                    <button
-                      key={index}
-                      style={styles.faqCard}
-                      onClick={() => handleSelectFAQ(faq)}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.transform = 'translateX(4px)';
-                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(13, 115, 119, 0.15)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.transform = 'translateX(0)';
-                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.08)';
-                      }}
-                    >
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '4px 10px',
-                        cursor: 'pointer',
-                      }}>
-                        <span style={{
-                          fontSize: 14,
-                          color: index === 0 ? '#006D77' : '#4a5568',
-                          fontWeight: index === 0 ? 600 : 500,
-                          textAlign: 'left',
-                          flex: 1,
-                        }}>
-                          {faq.question}
-                        </span>
-                        <ChevronRight size={20} color="#006D77" />
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div style={styles.inputArea}>
-              <form onSubmit={(e) => { e.preventDefault(); setShowChat(true); handleSend(e); }}>
-                <div style={styles.inputWrapper}>
-                  <input
-                    value={text}
-                    onChange={(e) => setText(e.target.value)}
-                    placeholder={placeholder}
-                    style={styles.input}
-                  />
-                  <button
-                    type="submit"
-                    disabled={loading || !text.trim()}
-                    style={{
-                      ...styles.sendButton,
-                      opacity: loading || !text.trim() ? 0.5 : 1,
-                      cursor: loading || !text.trim() ? 'not-allowed' : 'pointer',
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!loading && text.trim()) {
-                        e.currentTarget.style.transform = 'scale(1.1)';
-                        e.currentTarget.style.background = '#0a5f62';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = 'scale(1)';
-                      e.currentTarget.style.background = '#006D77';
-                    }}
-                  >
-                    <Send size={18} />
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        ) : (
-          <div style={styles.chatScreen}>
-            <div style={styles.header}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <button
-                  onClick={handleBackToFAQs}
-                  style={{
-                    background: 'rgba(255, 255, 255, 0.2)',
-                    border: 'none',
-                    color: 'white',
-                    cursor: 'pointer',
-                    borderRadius: 8,
-                    padding: 8,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    transition: 'all 0.2s',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
-                  }}
-                >
-                  <ArrowLeft size={20} />
-                </button>
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: 16 }}>{title}</div>
-                  <div style={{ fontSize: 12, opacity: 0.9 }}>Online</div>
-                </div>
-              </div>
-              <button
-                onClick={() => {
-                  setOpen(false);
-                  setTimeout(() => setShowChat(false), 300);
-                }}
-                style={{
-                  background: 'rgba(255, 255, 255, 0.2)',
-                  border: 'none',
-                  color: 'white',
-                  cursor: 'pointer',
-                  borderRadius: 8,
-                  padding: 8,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  transition: 'all 0.2s',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
-                }}
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <div style={styles.messagesArea}>
-              {messages.length === 0 && (
-                <div style={{
-                  textAlign: 'center',
-                  color: '#718096',
-                  fontSize: 14,
-                  padding: '40px 20px',
-                }}>
-                  Start a conversation...
-                </div>
-              )}
-              {messages.map((msg, idx) => (
-                <div
-                  key={idx}
-                  style={msg.role === 'user' ? styles.userMessage : styles.botMessage}
-                >
-                  {msg.text}
-                </div>
-              ))}
-              {loading && (
-                <div style={{
-                  alignSelf: 'flex-start',
-                  background: '#d1e7e8',
-                  padding: '12px 16px',
-                  borderRadius: '16px 16px 16px 4px',
-                  fontSize: 14,
-                  color: '#4a5568',
-                }}>
-                  <div style={{ display: 'flex', gap: 4 }}>
-                    <div style={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: '50%',
-                      background: '#006D77',
-                      animation: 'pulse 1.4s ease-in-out infinite',
-                    }} />
-                    <div style={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: '50%',
-                      background: '#006D77',
-                      animation: 'pulse 1.4s ease-in-out 0.2s infinite',
-                    }} />
-                    <div style={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: '50%',
-                      background: '#006D77',
-                      animation: 'pulse 1.4s ease-in-out 0.4s infinite',
-                    }} />
-                  </div>
-                </div>
-              )}
-              <div ref={messagesEndRef} />
-            </div>
-
-            <div style={styles.inputArea}>
-              <form onSubmit={handleSend}>
-                <div style={styles.inputWrapper}>
-                  <input
-                    value={text}
-                    onChange={(e) => setText(e.target.value)}
-                    placeholder={placeholder}
-                    style={styles.input}
-                  />
-                  <button
-                    type="submit"
-                    disabled={loading || !text.trim()}
-                    style={{
-                      ...styles.sendButton,
-                      opacity: loading || !text.trim() ? 0.5 : 1,
-                      cursor: loading || !text.trim() ? 'not-allowed' : 'pointer',
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!loading && text.trim()) {
-                        e.currentTarget.style.transform = 'scale(1.1)';
-                        e.currentTarget.style.background = '#0a5f62';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = 'scale(1)';
-                      e.currentTarget.style.background = '#006D77';
-                    }}
-                  >
-                    <Send size={18} />
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
+        {view === 'login' && (
+          <LoginForm
+            styles={styles}
+            name={name}
+            setName={setName}
+            email={email}
+            setEmail={setEmail}
+            query={query}
+            setQuery={setQuery}
+            sending={sending}
+            onSubmit={submit}
+            themeSettings={themeSettings}
+          />
         )}
       </div>
     </>
   );
 }
-
