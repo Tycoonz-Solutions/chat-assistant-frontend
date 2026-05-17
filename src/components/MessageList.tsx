@@ -1,6 +1,6 @@
 // components/chat-widget/components/MessageList.tsx
 import React from 'react';
-import { ThemeSettings } from '../../types';
+import type { ThemeSettings } from '../../types';
 
 export default function MessageList({
   styles,

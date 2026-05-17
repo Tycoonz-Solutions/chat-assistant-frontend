@@ -3,7 +3,7 @@ import React from 'react';
 import { ArrowLeft } from 'lucide-react';
 import MessageList from './MessageList';
 import InputArea from './InputArea';
-import { ThemeSettings } from '../../types';
+import type { ThemeSettings } from '../../types';
 
 export default function ChatScreen({
   styles,
@@ -15,12 +15,13 @@ export default function ChatScreen({
   onSend,
   onBack,
   messagesEndRef,
-  themeSettings
-
+  themeSettings,
+  canEscalate,
+  onContactSupport,
 }: {
-  styles: any;
+  styles: Record<string, React.CSSProperties>;
   title: string;
-  messages: any[];
+  messages: { role: string; text: string; time: string }[];
   loading: boolean;
   text: string;
   setText: (s: string) => void;
@@ -28,12 +29,15 @@ export default function ChatScreen({
   onBack: () => void;
   messagesEndRef: React.RefObject<HTMLDivElement>;
   themeSettings: ThemeSettings;
+  canEscalate?: boolean;
+  onContactSupport?: () => void;
 }) {
   return (
     <div style={styles.chatScreen}>
-      <div style={styles.header}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div style={styles.header as React.CSSProperties}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0 }}>
           <button
+            type="button"
             onClick={onBack}
             style={{
               background: 'transparent',
@@ -56,19 +60,89 @@ export default function ChatScreen({
           >
             <ArrowLeft size={20} />
           </button>
-          <div>
-            <div style={{ fontWeight: 600, fontSize: themeSettings?.fontSizeBase ? themeSettings?.fontSizeBase / 2 + 4 : 16 }}>{title}</div>
-            <div style={{ fontSize: themeSettings?.fontSizeBase ? themeSettings?.fontSizeBase / 2 - 2 : 12, opacity: 0.9 }}>Online</div>
+          <div style={{ minWidth: 0 }}>
+            <div
+              style={{
+                fontWeight: 600,
+                fontSize: themeSettings?.fontSizeBase
+                  ? themeSettings.fontSizeBase / 2 + 4
+                  : 16,
+              }}
+            >
+              {title}
+            </div>
+            <div
+              style={{
+                fontSize: themeSettings?.fontSizeBase
+                  ? themeSettings.fontSizeBase / 2 - 2
+                  : 12,
+                opacity: 0.9,
+              }}
+            >
+              Online
+            </div>
           </div>
         </div>
+        {canEscalate && onContactSupport ? (
+          <button
+            type="button"
+            onClick={onContactSupport}
+            style={{
+              flexShrink: 0,
+              marginLeft: 8,
+              background: "rgba(255,255,255,0.2)",
+              border: "1px solid rgba(255,255,255,0.5)",
+              color: "white",
+              borderRadius: 999,
+              padding: "8px 14px",
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            Contact support
+          </button>
+        ) : null}
       </div>
 
-      <MessageList styles={styles} messages={messages} loading={loading} messagesEndRef={messagesEndRef} themeSettings={themeSettings}
+      <MessageList
+        styles={styles as never}
+        messages={messages as never[]}
+        loading={loading}
+        messagesEndRef={messagesEndRef}
+        themeSettings={themeSettings}
       />
 
-<div>asad</div>
+      {canEscalate && onContactSupport ? (
+        <div
+          style={{
+            flexShrink: 0,
+            padding: "6px 16px 4px",
+            textAlign: "center",
+            background: themeSettings?.isDarkMode ? "#2b2b2b" : "#f8f8f8",
+          }}
+        >
+          <button
+            type="button"
+            onClick={onContactSupport}
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              fontSize: themeSettings?.fontSizeBase ? themeSettings.fontSizeBase / 2 - 1 : 13,
+              fontWeight: 600,
+              color: themeSettings.primaryColor ?? "#006D77",
+              textDecoration: "underline",
+              padding: "2px 4px",
+            }}
+          >
+            Need help? Create support ticket
+          </button>
+        </div>
+      ) : null}
+
       <InputArea
-        styles={styles}
+        styles={styles as never}
         text={text}
         setText={setText}
         onSend={onSend}

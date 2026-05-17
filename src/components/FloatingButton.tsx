@@ -1,6 +1,6 @@
 // components/chat-widget/components/FloatingButton.tsx
 import { MessageCircle, X } from 'lucide-react';
-import { ThemeSettings } from '../../types';
+import type { ThemeSettings } from '../../types';
 
 export default function FloatingButton({
   open,

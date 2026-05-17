@@ -1,7 +1,7 @@
 // components/chat-widget/components/InputArea.tsx
 import React from 'react';
 import { Send } from 'lucide-react';
-import { ThemeSettings } from '../../types';
+import type { ThemeSettings } from '../../types';
 
 export default function InputArea({
   styles,

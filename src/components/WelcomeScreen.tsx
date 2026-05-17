@@ -1,7 +1,16 @@
 // components/chat-widget/components/WelcomeScreen.tsx
-import React from 'react';
-import { List, ChevronRight, Send, LucideIcon } from 'lucide-react';
-import { FAQ, ThemeSettings } from '../../types/index';
+import React from "react";
+import { List, ChevronRight, Send, type LucideIcon } from "lucide-react";
+import type { FAQ, ThemeSettings } from "../../types/index";
+
+const DEFAULT_GREETING = "Hi there!\nAI chat powered by our team - how can we assist you today?";
+
+function splitGreetingMessage(raw: string | undefined): { headline: string; subtitle: string } {
+  const t = (raw ?? "").trim() || DEFAULT_GREETING;
+  const idx = t.indexOf("\n");
+  if (idx === -1) return { headline: t, subtitle: "" };
+  return { headline: t.slice(0, idx).trim(), subtitle: t.slice(idx + 1).trim() };
+}
 
 export default function WelcomeScreen({
   styles,
@@ -11,7 +20,9 @@ export default function WelcomeScreen({
   text,
   setText,
   onSend,
-  themeSettings
+  themeSettings,
+  canEscalate,
+  onCreateSupportTicket,
 }: {
   styles: any;
   faqs: FAQ[];
@@ -21,19 +32,51 @@ export default function WelcomeScreen({
   setText: (s: string) => void;
   onSend: (e: React.FormEvent) => void;
   themeSettings: ThemeSettings;
+  canEscalate?: boolean;
+  onCreateSupportTicket?: () => void;
 }) {
+  const { headline, subtitle } = splitGreetingMessage(themeSettings.greetingMessage);
   return (
     <div style={styles.welcomeScreen}>
       <div style={styles.welcomeHeader}>
         <div style={{ position: 'relative', zIndex: 1 }}>
           <h2 style={{ margin: 0, fontSize: themeSettings?.fontSizeBase, fontWeight: 700, marginBottom: 8 }}>
-            Hi there!
+            {headline}
           </h2>
-          <p style={{ margin: 0, fontSize: themeSettings?.fontSizeBase / 2, opacity: 0.95, lineHeight: 1.5 }}>
-            AI chat powered by our team - how can we assist you today?
-          </p>
+          {subtitle ? (
+            <p style={{ margin: 0, fontSize: themeSettings?.fontSizeBase / 2, opacity: 0.95, lineHeight: 1.5 }}>
+              {subtitle}
+            </p>
+          ) : null}
         </div>
       </div>
+
+      {canEscalate && onCreateSupportTicket ? (
+        <div
+          style={{
+            width: "90%",
+            padding: "8px 12px 0",
+            textAlign: "center",
+          }}
+        >
+          <button
+            type="button"
+            onClick={onCreateSupportTicket}
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              fontSize: themeSettings?.fontSizeBase ? themeSettings.fontSizeBase / 2 - 1 : 13,
+              fontWeight: 600,
+              color: themeSettings.primaryColor ?? "#006D77",
+              textDecoration: "underline",
+              padding: "4px 8px",
+            }}
+          >
+            Need help? Create support ticket
+          </button>
+        </div>
+      ) : null}
 
       <div style={{
         marginTop: '-30px',
@@ -68,6 +111,21 @@ export default function WelcomeScreen({
           <div className="hide-scrollbar" style={{
             display: 'flex', flexDirection: 'column', gap: 4, height: '88%', overflowY: 'auto' as const,
           }}>
+            {faqs.length === 0 ? (
+              <p
+                style={{
+                  margin: 0,
+                  padding: '12px 8px',
+                  fontSize: themeSettings?.fontSizeBase
+                    ? themeSettings.fontSizeBase / 2
+                    : 14,
+                  color: themeSettings?.isDarkMode ? '#aaa' : '#64748b',
+                  textAlign: 'center',
+                }}
+              >
+                No FAQs yet for this project. Add them in the admin under FAQs/Knowledge Base.
+              </p>
+            ) : null}
             {faqs.map((faq, index) => (
               <button
                 key={index}
