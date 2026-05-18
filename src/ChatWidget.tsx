@@ -1,7 +1,7 @@
 // components/chat-widget/ChatWidget.tsx
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import FloatingButton from "./components/FloatingButton";
 import WelcomeScreen from "./components/WelcomeScreen";
 import ChatScreen from "./components/ChatScreen";
@@ -10,7 +10,16 @@ import EscalateScreen from "./components/EscalateScreen";
 import type { EscalatePayload } from "./components/EscalateScreen";
 import type { FAQ, Msg, ChatFAQWidgetProps, ThemeSettings } from "../types/index";
 import { fetchWidgetConfig } from "./lib/widget-config";
-import { postVisitorEscalate, postVisitorIdentify } from "./widget-visitor-api";
+import {
+  listVisitorTicketMessages,
+  postVisitorEscalate,
+  postVisitorIdentify,
+  postVisitorTicketMessage,
+} from "./widget-visitor-api";
+import {
+  mergeFaqWithTicketMessages,
+  ticketMessageToWidgetMsg,
+} from "./lib/ticket-thread-ui";
 
 type View = "prechat" | "welcome" | "chat" | "escalate";
 
@@ -18,6 +27,7 @@ type VisitorProfile = {
   email: string;
   name: string;
   accessToken?: string;
+  ticketId?: string | null;
 };
 
 export default function ChatWidget({
@@ -96,6 +106,38 @@ export default function ChatWidget({
   visitorRef.current = visitor;
 
   const canEscalate = Boolean(apiBaseUrl?.trim() && projectToken?.trim());
+  const activeTicketId = visitor?.ticketId ?? null;
+  const visitorAccessToken = visitor?.accessToken ?? null;
+
+  const ticketSyncInFlightRef = useRef(false);
+
+  const syncTicketThread = useCallback(async () => {
+    const base = apiBaseUrl?.trim();
+    const tid = visitorRef.current?.ticketId;
+    const token = visitorRef.current?.accessToken;
+    if (!base || !tid || !token) return;
+    if (ticketSyncInFlightRef.current) return;
+
+    ticketSyncInFlightRef.current = true;
+    try {
+      const rows = await listVisitorTicketMessages(base, tid, token);
+      const ticketMsgs = rows.map(ticketMessageToWidgetMsg);
+      setMessages((prev) => mergeFaqWithTicketMessages(prev, ticketMsgs));
+    } catch (err) {
+      console.warn("[ChatWidget] Could not sync ticket messages", err);
+    } finally {
+      ticketSyncInFlightRef.current = false;
+    }
+  }, [apiBaseUrl]);
+
+  useEffect(() => {
+    if (!open || view !== "chat" || !activeTicketId || !visitorAccessToken) return;
+    void syncTicketThread();
+    const id = window.setInterval(() => {
+      void syncTicketThread();
+    }, 12_000);
+    return () => window.clearInterval(id);
+  }, [open, view, activeTicketId, visitorAccessToken, syncTicketThread]);
 
   const collectIdentityOnEscalate = useMemo(
     () => !visitor || !visitor.email,
@@ -140,6 +182,29 @@ export default function ChatWidget({
   async function handleSend(e?: React.FormEvent) {
     e?.preventDefault();
     if (!text.trim() || loading) return;
+
+    const base = apiBaseUrl?.trim();
+    const tid = visitor?.ticketId;
+    const token = visitor?.accessToken;
+    if (base && tid && token) {
+      const body = text.trim();
+      setText("");
+      setLoading(true);
+      try {
+        await postVisitorTicketMessage(base, tid, token, body);
+        await syncTicketThread();
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setMessages((m) => [
+          ...m,
+          { role: "bot", text: `Could not send: ${msg}`, time: nowTime() },
+        ]);
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
     const userMsg: Msg = { role: "user", text: text.trim(), time: nowTime() };
     setMessages((m) => [...m, userMsg]);
     setText("");
@@ -508,7 +573,17 @@ export default function ChatWidget({
         email: r.email ?? payload.email,
         name: r.name ?? payload.name,
         accessToken: r.accessToken,
+        ticketId: r.ticketId ?? null,
       });
+      if (r.ticketId && r.accessToken) {
+        visitorRef.current = {
+          email: r.email ?? payload.email,
+          name: r.name ?? payload.name,
+          accessToken: r.accessToken,
+          ticketId: r.ticketId,
+        };
+        await syncTicketThread();
+      }
       setView("welcome");
     } catch (e) {
       setPrechatError(e instanceof Error ? e.message : "Could not save your details");
@@ -537,11 +612,22 @@ export default function ChatWidget({
         email: r.email ?? email,
         name: r.name ?? v?.name ?? payload.name ?? "",
         accessToken: r.accessToken,
+        ticketId: r.ticketId ?? v?.ticketId ?? null,
       }));
-      setMessages((m) => [
-        ...m,
-        { role: "bot", text: r.message, time: nowTime() },
-      ]);
+      visitorRef.current = {
+        email: r.email ?? email,
+        name: r.name ?? payload.name ?? "",
+        accessToken: r.accessToken,
+        ticketId: r.ticketId ?? null,
+      };
+      if (r.ticketId && r.accessToken) {
+        await syncTicketThread();
+      } else {
+        setMessages((m) => [
+          ...m,
+          { role: "bot", text: r.message, time: nowTime() },
+        ]);
+      }
       setView("chat");
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);

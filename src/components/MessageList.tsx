@@ -32,7 +32,7 @@ export default function MessageList({
       {messages.map((msg, idx) => {
         const isBot = msg.role === 'bot';
         return (
-          <div key={idx} className={`message-row ${isBot ? 'bot' : 'user'}`}>
+          <div key={msg.id ?? `local-${idx}`} className={`message-row ${isBot ? 'bot' : 'user'}`}>
             {isBot && (
               <div className="bot-avatar" aria-hidden>
                 <img src="https://i.pravatar.cc/150?img=32" alt="bot avatar" />

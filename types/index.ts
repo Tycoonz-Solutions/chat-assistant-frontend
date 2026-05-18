@@ -1,6 +1,6 @@
 // components/chat-widget/types.ts
 export type FAQ = { question: string; ans: string };
-export type Msg = { role: 'user' | 'bot'; text: string; time: string };
+export type Msg = { role: 'user' | 'bot'; text: string; time: string; id?: string };
 
 export interface ChatFAQWidgetProps {
   title?: string;

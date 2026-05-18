@@ -48,6 +48,88 @@ export async function postVisitorIdentify(
   return readEnvelope(json);
 }
 
+export type VisitorTicketMessage = {
+  id: string;
+  senderRole: "visitor" | "staff" | "unknown";
+  senderLabel: string;
+  text: string;
+  createdAt: string | null;
+};
+
+function parseTicketMessages(json: Record<string, unknown>): VisitorTicketMessage[] {
+  const data = json.data;
+  const rows = Array.isArray(data) ? data : data ? [data] : [];
+  return rows.map((row) => {
+    const r = row as Record<string, unknown>;
+    const attrs = (r.attributes ?? {}) as Record<string, unknown>;
+    const role = attrs.senderRole;
+    return {
+      id: String(r.id ?? ""),
+      senderRole:
+        role === "visitor" || role === "staff" ? role : "unknown",
+      senderLabel:
+        typeof attrs.senderLabel === "string" ? attrs.senderLabel : "Support",
+      text: typeof attrs.text === "string" ? attrs.text : "",
+      createdAt:
+        typeof attrs.createdAt === "string" ? attrs.createdAt : null,
+    };
+  });
+}
+
+export async function listVisitorTicketMessages(
+  apiBaseUrl: string,
+  ticketId: string,
+  accessToken: string
+): Promise<VisitorTicketMessage[]> {
+  const base = apiBaseUrl.replace(/\/$/, "");
+  const res = await fetch(
+    `${base}/api/v1/chat-bot/auth/ticket/${encodeURIComponent(ticketId)}/messages`,
+    {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    }
+  );
+  const json = (await res.json()) as Record<string, unknown>;
+  if (!res.ok || json.success === false) {
+    throw new Error(
+      typeof json.message === "string" && json.message
+        ? json.message
+        : `Could not load conversation (${res.status})`
+    );
+  }
+  return parseTicketMessages(json);
+}
+
+export async function postVisitorTicketMessage(
+  apiBaseUrl: string,
+  ticketId: string,
+  accessToken: string,
+  text: string
+): Promise<VisitorTicketMessage> {
+  const base = apiBaseUrl.replace(/\/$/, "");
+  const res = await fetch(
+    `${base}/api/v1/chat-bot/auth/ticket/${encodeURIComponent(ticketId)}/messages`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ text: text.trim() }),
+    }
+  );
+  const json = (await res.json()) as Record<string, unknown>;
+  if (!res.ok || json.success === false) {
+    throw new Error(
+      typeof json.message === "string" && json.message
+        ? json.message
+        : `Could not send message (${res.status})`
+    );
+  }
+  const list = parseTicketMessages(json);
+  if (!list[0]) throw new Error("Unexpected response from server");
+  return list[0];
+}
+
 export async function postVisitorEscalate(
   apiBaseUrl: string,
   body: { email: string; name?: string; projectToken: string; message: string }
