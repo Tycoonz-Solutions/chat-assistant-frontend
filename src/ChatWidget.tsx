@@ -5,6 +5,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import FloatingButton from "./components/FloatingButton";
 import WelcomeScreen from "./components/WelcomeScreen";
 import ChatScreen from "./components/ChatScreen";
+import WidgetMainView from "./components/WidgetMainView";
+import type { WidgetTab } from "./components/WidgetTabBar";
 import PreChatScreen from "./components/PreChatScreen";
 import EscalateScreen from "./components/EscalateScreen";
 import type { EscalatePayload } from "./components/EscalateScreen";
@@ -20,8 +22,12 @@ import {
   mergeFaqWithTicketMessages,
   ticketMessageToWidgetMsg,
 } from "./lib/ticket-thread-ui";
+import {
+  loadVisitorSession,
+  saveVisitorSession,
+} from "./lib/visitor-session";
 
-type View = "prechat" | "welcome" | "chat" | "escalate";
+type View = "prechat" | "welcome" | "chat" | "main" | "escalate";
 
 type VisitorProfile = {
   email: string;
@@ -44,7 +50,14 @@ export default function ChatWidget({
   const visitorGateEffective = visitorGate !== undefined ? visitorGate : gateDefault;
 
   const [open, setOpen] = useState(false);
-  const [view, setView] = useState<View>(() => (visitorGateEffective ? "prechat" : "welcome"));
+  const [view, setView] = useState<View>(() => {
+    if (!visitorGateEffective) return "welcome";
+    return loadVisitorSession(projectToken) ? "main" : "prechat";
+  });
+  const [mainTab, setMainTab] = useState<WidgetTab>(() => {
+    const stored = loadVisitorSession(projectToken);
+    return stored?.ticketId ? "conversation" : "help";
+  });
   const [messages, setMessages] = useState<Msg[]>([]);
   const [text, setText] = useState("");
   const [awaitingBot, setAwaitingBot] = useState(false);
@@ -132,7 +145,23 @@ export default function ChatWidget({
   }, [apiBaseUrl]);
 
   useEffect(() => {
-    if (!open || view !== "chat" || !activeTicketId || !visitorAccessToken) return;
+    if (!visitorGateEffective) return;
+    const stored = loadVisitorSession(projectToken);
+    if (!stored?.email) return;
+    setVisitor(stored);
+    visitorRef.current = stored;
+    setView("main");
+    setMainTab(stored.ticketId ? "conversation" : "help");
+  }, [visitorGateEffective, projectToken]);
+
+  useEffect(() => {
+    if (visitor) {
+      saveVisitorSession(visitor, projectToken);
+    }
+  }, [visitor, projectToken]);
+
+  useEffect(() => {
+    if (!open || view !== "main" || !activeTicketId || !visitorAccessToken) return;
     void syncTicketThread();
     const id = window.setInterval(() => {
       void syncTicketThread();
@@ -154,6 +183,7 @@ export default function ChatWidget({
         setTimeout(() => {
           setView((v) => {
             if (visitorGateEffective && !visitorRef.current) return "prechat";
+            if (visitorGateEffective && visitorRef.current) return "main";
             if (v === "chat" || v === "escalate") return "welcome";
             return v;
           });
@@ -269,13 +299,16 @@ export default function ChatWidget({
   }
 
   async function handleSelectFAQ(f: FAQ) {
-    setView("chat");
+    if (visitorGateEffective) {
+      setMainTab("conversation");
+    } else {
+      setView("chat");
+    }
     const userMsg: Msg = { role: "user", text: f.question, time: nowTime() };
     setMessages((m) => [...m, userMsg]);
     setAwaitingBot(true);
 
     setTimeout(() => {
-      // Listed FAQs always use embedded answers — no OpenAI / quota for an explicit pick.
       const botMsg: Msg = { role: "bot", text: f.ans, time: nowTime() };
       setMessages((m) => [...m, botMsg]);
       setAwaitingBot(false);
@@ -283,7 +316,11 @@ export default function ChatWidget({
   }
 
   function handleBackToFAQs() {
-    setView("welcome");
+    if (visitorGateEffective) {
+      setMainTab("help");
+    } else {
+      setView("welcome");
+    }
   }
 
   function hexToRgb(hex: string) {
@@ -572,22 +609,22 @@ export default function ChatWidget({
         email: payload.email,
         name: payload.name || undefined,
       });
-      setVisitor({
+      const profile = {
         email: r.email ?? payload.email,
         name: r.name ?? payload.name,
         accessToken: r.accessToken,
         ticketId: r.ticketId ?? null,
-      });
+      };
+      setVisitor(profile);
+      visitorRef.current = profile;
+      saveVisitorSession(profile, projectToken);
       if (r.ticketId && r.accessToken) {
-        visitorRef.current = {
-          email: r.email ?? payload.email,
-          name: r.name ?? payload.name,
-          accessToken: r.accessToken,
-          ticketId: r.ticketId,
-        };
         await syncTicketThread();
+        setMainTab("conversation");
+      } else {
+        setMainTab("help");
       }
-      setView("welcome");
+      setView("main");
     } catch (e) {
       setPrechatError(e instanceof Error ? e.message : "Could not save your details");
     } finally {
@@ -631,14 +668,16 @@ export default function ChatWidget({
           { role: "bot", text: r.message, time: nowTime() },
         ]);
       }
-      setView("chat");
+      setMainTab("conversation");
+      setView("main");
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       setMessages((m) => [
         ...m,
         { role: "bot", text: `Could not send request: ${msg}`, time: nowTime() },
       ]);
-      setView("chat");
+      setMainTab("conversation");
+      setView("main");
     } finally {
       setEscalateBusy(false);
     }
@@ -701,7 +740,30 @@ export default function ChatWidget({
           </div>
         )}
 
-        {view === "welcome" && (
+        {view === "main" && visitorGateEffective ? (
+          <WidgetMainView
+            styles={styles as unknown as Record<string, React.CSSProperties>}
+            title={chatTitle}
+            messages={messages}
+            showTyping={awaitingBot}
+            sending={sending}
+            text={text}
+            setText={setText}
+            onSend={handleSend}
+            messagesEndRef={messagesEndRef as unknown as React.RefObject<HTMLDivElement>}
+            themeSettings={themeSettings}
+            faqs={faqs}
+            onSelectFAQ={handleSelectFAQ}
+            mainTab={mainTab}
+            onMainTabChange={setMainTab}
+            hasActiveTicket={Boolean(activeTicketId)}
+            canEscalate={canEscalate}
+            onContactSupport={() => setView("escalate")}
+            placeholder={placeholder}
+          />
+        ) : null}
+
+        {view === "welcome" && !visitorGateEffective ? (
           <WelcomeScreen
             styles={styles}
             faqs={faqs}
@@ -718,9 +780,9 @@ export default function ChatWidget({
             canEscalate={canEscalate}
             onCreateSupportTicket={() => setView("escalate")}
           />
-        )}
+        ) : null}
 
-        {view === "chat" && (
+        {view === "chat" && !visitorGateEffective ? (
           <ChatScreen
             styles={styles}
             title={chatTitle}
@@ -736,14 +798,17 @@ export default function ChatWidget({
             canEscalate={canEscalate}
             onContactSupport={() => setView("escalate")}
           />
-        )}
+        ) : null}
 
         {view === "escalate" && (
           <EscalateScreen
             styles={styles as unknown as Record<string, React.CSSProperties>}
             themeSettings={themeSettings}
             title={chatTitle}
-            onBack={() => setView("chat")}
+            onBack={() => {
+              setMainTab("conversation");
+              setView("main");
+            }}
             onSubmit={onEscalateSubmit}
             busy={escalateBusy}
             collectIdentity={collectIdentityOnEscalate}
