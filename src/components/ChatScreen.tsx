@@ -9,7 +9,8 @@ export default function ChatScreen({
   styles,
   title,
   messages,
-  loading,
+  showTyping,
+  sending,
   text,
   setText,
   onSend,
@@ -22,7 +23,8 @@ export default function ChatScreen({
   styles: Record<string, React.CSSProperties>;
   title: string;
   messages: { role: string; text: string; time: string }[];
-  loading: boolean;
+  showTyping?: boolean;
+  sending?: boolean;
   text: string;
   setText: (s: string) => void;
   onSend: (e?: React.FormEvent) => Promise<void> | void;
@@ -108,7 +110,7 @@ export default function ChatScreen({
       <MessageList
         styles={styles as never}
         messages={messages as never[]}
-        loading={loading}
+        showTyping={showTyping}
         messagesEndRef={messagesEndRef}
         themeSettings={themeSettings}
       />
@@ -146,7 +148,7 @@ export default function ChatScreen({
         text={text}
         setText={setText}
         onSend={onSend}
-        loading={loading}
+        loading={Boolean(showTyping || sending)}
         themeSettings={themeSettings}
       />
     </div>

@@ -5,13 +5,14 @@ import type { ThemeSettings } from '../../types';
 export default function MessageList({
   styles,
   messages,
-  loading=true,
+  showTyping = false,
   messagesEndRef,
   themeSettings
 }: {
   styles: any;
   messages: any[];
-  loading: boolean;
+  /** Bot/FAQ is generating a reply — not used when waiting on a live agent */
+  showTyping?: boolean;
   messagesEndRef: React.RefObject<HTMLDivElement>;
   themeSettings: ThemeSettings
 }) {
@@ -51,7 +52,7 @@ export default function MessageList({
         );
       })}
 
-      {loading && (
+      {showTyping && (
         <div style={{
           display: 'flex',
           gap: 8,

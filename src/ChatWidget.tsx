@@ -47,7 +47,8 @@ export default function ChatWidget({
   const [view, setView] = useState<View>(() => (visitorGateEffective ? "prechat" : "welcome"));
   const [messages, setMessages] = useState<Msg[]>([]);
   const [text, setText] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [awaitingBot, setAwaitingBot] = useState(false);
+  const [sending, setSending] = useState(false);
   const [visitor, setVisitor] = useState<VisitorProfile | null>(null);
   const [prechatBusy, setPrechatBusy] = useState(false);
   const [prechatError, setPrechatError] = useState<string | null>(null);
@@ -181,7 +182,7 @@ export default function ChatWidget({
 
   async function handleSend(e?: React.FormEvent) {
     e?.preventDefault();
-    if (!text.trim() || loading) return;
+    if (!text.trim() || sending || awaitingBot) return;
 
     const base = apiBaseUrl?.trim();
     const tid = visitor?.ticketId;
@@ -189,7 +190,9 @@ export default function ChatWidget({
     if (base && tid && token) {
       const body = text.trim();
       setText("");
-      setLoading(true);
+      const userMsg: Msg = { role: "user", text: body, time: nowTime() };
+      setMessages((m) => [...m, userMsg]);
+      setSending(true);
       try {
         await postVisitorTicketMessage(base, tid, token, body);
         await syncTicketThread();
@@ -200,7 +203,7 @@ export default function ChatWidget({
           { role: "bot", text: `Could not send: ${msg}`, time: nowTime() },
         ]);
       } finally {
-        setLoading(false);
+        setSending(false);
       }
       return;
     }
@@ -208,7 +211,7 @@ export default function ChatWidget({
     const userMsg: Msg = { role: "user", text: text.trim(), time: nowTime() };
     setMessages((m) => [...m, userMsg]);
     setText("");
-    setLoading(true);
+    setAwaitingBot(true);
 
     try {
       let reply: string;
@@ -261,7 +264,7 @@ export default function ChatWidget({
         ]);
       }
     } finally {
-      setLoading(false);
+      setAwaitingBot(false);
     }
   }
 
@@ -269,13 +272,13 @@ export default function ChatWidget({
     setView("chat");
     const userMsg: Msg = { role: "user", text: f.question, time: nowTime() };
     setMessages((m) => [...m, userMsg]);
-    setLoading(true);
+    setAwaitingBot(true);
 
     setTimeout(() => {
       // Listed FAQs always use embedded answers — no OpenAI / quota for an explicit pick.
       const botMsg: Msg = { role: "bot", text: f.ans, time: nowTime() };
       setMessages((m) => [...m, botMsg]);
-      setLoading(false);
+      setAwaitingBot(false);
     }, 300);
   }
 
@@ -722,7 +725,8 @@ export default function ChatWidget({
             styles={styles}
             title={chatTitle}
             messages={messages}
-            loading={loading}
+            showTyping={awaitingBot}
+            sending={sending}
             text={text}
             setText={setText}
             onSend={handleSend}
