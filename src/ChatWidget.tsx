@@ -6,7 +6,6 @@ import FloatingButton from "./components/FloatingButton";
 import WelcomeScreen from "./components/WelcomeScreen";
 import ChatScreen from "./components/ChatScreen";
 import WidgetMainView from "./components/WidgetMainView";
-import type { WidgetTab } from "./components/WidgetTabBar";
 import PreChatScreen from "./components/PreChatScreen";
 import EscalateScreen from "./components/EscalateScreen";
 import type { EscalatePayload } from "./components/EscalateScreen";
@@ -19,9 +18,10 @@ import {
   postVisitorTicketMessage,
 } from "./widget-visitor-api";
 import {
-  mergeFaqWithTicketMessages,
+  buildVisitorThread,
   ticketMessageToWidgetMsg,
 } from "./lib/ticket-thread-ui";
+import { appendFaqExchange, loadFaqTranscript } from "./lib/faq-transcript";
 import {
   loadVisitorSession,
   saveVisitorSession,
@@ -54,10 +54,7 @@ export default function ChatWidget({
     if (!visitorGateEffective) return "welcome";
     return loadVisitorSession(projectToken) ? "main" : "prechat";
   });
-  const [mainTab, setMainTab] = useState<WidgetTab>(() => {
-    const stored = loadVisitorSession(projectToken);
-    return stored?.ticketId ? "conversation" : "help";
-  });
+  const [helpOpen, setHelpOpen] = useState(false);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [text, setText] = useState("");
   const [awaitingBot, setAwaitingBot] = useState(false);
@@ -136,13 +133,14 @@ export default function ChatWidget({
     try {
       const rows = await listVisitorTicketMessages(base, tid, token);
       const ticketMsgs = rows.map(ticketMessageToWidgetMsg);
-      setMessages((prev) => mergeFaqWithTicketMessages(prev, ticketMsgs));
+      const faqExchanges = loadFaqTranscript(projectToken, tid);
+      setMessages(buildVisitorThread(ticketMsgs, faqExchanges));
     } catch (err) {
       console.warn("[ChatWidget] Could not sync ticket messages", err);
     } finally {
       ticketSyncInFlightRef.current = false;
     }
-  }, [apiBaseUrl]);
+  }, [apiBaseUrl, projectToken]);
 
   useEffect(() => {
     if (!visitorGateEffective) return;
@@ -151,7 +149,7 @@ export default function ChatWidget({
     setVisitor(stored);
     visitorRef.current = stored;
     setView("main");
-    setMainTab(stored.ticketId ? "conversation" : "help");
+    setHelpOpen(false);
   }, [visitorGateEffective, projectToken]);
 
   useEffect(() => {
@@ -300,24 +298,57 @@ export default function ChatWidget({
 
   async function handleSelectFAQ(f: FAQ) {
     if (visitorGateEffective) {
-      setMainTab("conversation");
+      setHelpOpen(false);
     } else {
       setView("chat");
     }
-    const userMsg: Msg = { role: "user", text: f.question, time: nowTime() };
-    setMessages((m) => [...m, userMsg]);
-    setAwaitingBot(true);
 
-    setTimeout(() => {
-      const botMsg: Msg = { role: "bot", text: f.ans, time: nowTime() };
-      setMessages((m) => [...m, botMsg]);
+    setAwaitingBot(true);
+    const base = apiBaseUrl?.trim();
+    const tid = visitorRef.current?.ticketId;
+    const token = visitorRef.current?.accessToken;
+    const askedAt = new Date().toISOString();
+
+    try {
+      if (base && tid && token) {
+        appendFaqExchange(projectToken, tid, {
+          question: f.question,
+          answer: f.ans,
+          askedAt,
+        });
+        await syncTicketThread();
+      } else {
+        const userMsg: Msg = {
+          role: "user",
+          text: f.question,
+          time: nowTime(),
+          sortAt: askedAt,
+          faqLocal: true,
+        };
+        const botMsg: Msg = {
+          role: "bot",
+          text: f.ans,
+          time: nowTime(),
+          sortAt: new Date(Date.parse(askedAt) + 1).toISOString(),
+          faqLocal: true,
+          faqForQuestion: f.question,
+        };
+        setMessages((m) => [...m, userMsg, botMsg]);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setMessages((m) => [
+        ...m,
+        { role: "bot", text: `Could not load help: ${msg}`, time: nowTime() },
+      ]);
+    } finally {
       setAwaitingBot(false);
-    }, 300);
+    }
   }
 
   function handleBackToFAQs() {
     if (visitorGateEffective) {
-      setMainTab("help");
+      setHelpOpen(true);
     } else {
       setView("welcome");
     }
@@ -620,9 +651,9 @@ export default function ChatWidget({
       saveVisitorSession(profile, projectToken);
       if (r.ticketId && r.accessToken) {
         await syncTicketThread();
-        setMainTab("conversation");
+        setHelpOpen(false);
       } else {
-        setMainTab("help");
+        setHelpOpen(false);
       }
       setView("main");
     } catch (e) {
@@ -668,7 +699,7 @@ export default function ChatWidget({
           { role: "bot", text: r.message, time: nowTime() },
         ]);
       }
-      setMainTab("conversation");
+      setHelpOpen(false);
       setView("main");
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -676,7 +707,7 @@ export default function ChatWidget({
         ...m,
         { role: "bot", text: `Could not send request: ${msg}`, time: nowTime() },
       ]);
-      setMainTab("conversation");
+      setHelpOpen(false);
       setView("main");
     } finally {
       setEscalateBusy(false);
@@ -698,6 +729,11 @@ export default function ChatWidget({
         @keyframes slideInRight { from{ opacity:0; transform:translateX(20px);} to{ opacity:1; transform:translateX(0);} }
         @keyframes slideInLeft  { from{ opacity:0; transform:translateX(-20px);} to{ opacity:1; transform:translateX(0);} }
         @keyframes pulse { 0%,100%{ transform:scale(1); opacity:1;} 50%{ transform:scale(1.1); opacity:0.8;} }
+        .widget-help-chip:focus,
+        .widget-help-chip:focus-visible {
+          outline: none;
+          box-shadow: none;
+        }
         @media (max-width: 600px) {
           .chat-panel.chat-pos-br, .chat-panel.chat-pos-tr { right: 8px !important; left: auto !important; }
           .chat-panel.chat-pos-bl, .chat-panel.chat-pos-tl { left: 8px !important; right: auto !important; }
@@ -754,8 +790,8 @@ export default function ChatWidget({
             themeSettings={themeSettings}
             faqs={faqs}
             onSelectFAQ={handleSelectFAQ}
-            mainTab={mainTab}
-            onMainTabChange={setMainTab}
+            helpOpen={helpOpen}
+            onHelpOpenChange={setHelpOpen}
             hasActiveTicket={Boolean(activeTicketId)}
             canEscalate={canEscalate}
             onContactSupport={() => setView("escalate")}
@@ -806,7 +842,7 @@ export default function ChatWidget({
             themeSettings={themeSettings}
             title={chatTitle}
             onBack={() => {
-              setMainTab("conversation");
+              setHelpOpen(false);
               setView("main");
             }}
             onSubmit={onEscalateSubmit}

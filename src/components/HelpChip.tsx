@@ -14,6 +14,7 @@ export default function HelpChip({ active, onClick, themeSettings }: Props) {
   return (
     <button
       type="button"
+      className="widget-help-chip"
       onClick={onClick}
       aria-expanded={active}
       aria-label={active ? "Back to messages" : "Browse quick help"}
@@ -35,6 +36,7 @@ export default function HelpChip({ active, onClick, themeSettings }: Props) {
             ? "0 1px 3px rgba(0,0,0,0.35)"
             : "0 1px 4px rgba(0,0,0,0.08)",
         transition: "background 0.15s, color 0.15s, border-color 0.15s",
+        outline: "none",
       }}
     >
       {active ? <X size={16} aria-hidden /> : <HelpCircle size={16} aria-hidden />}

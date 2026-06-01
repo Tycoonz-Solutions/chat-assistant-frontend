@@ -1,6 +1,16 @@
 // components/chat-widget/types.ts
 export type FAQ = { question: string; ans: string };
-export type Msg = { role: 'user' | 'bot'; text: string; time: string; id?: string };
+export type Msg = {
+  role: 'user' | 'bot';
+  text: string;
+  time: string;
+  id?: string;
+  /** ISO timestamp for ordering merged ticket + FAQ messages */
+  sortAt?: string;
+  /** FAQ quick-help row (not sent to agent ticket) */
+  faqLocal?: boolean;
+  faqForQuestion?: string;
+};
 
 export interface ChatFAQWidgetProps {
   title?: string;

@@ -1,4 +1,5 @@
 import type { Msg } from "../../types/index";
+import type { FaqExchange } from "./faq-transcript";
 import type { VisitorTicketMessage } from "../widget-visitor-api";
 
 function formatTime(iso: string | null): string {
@@ -13,18 +14,54 @@ function formatTime(iso: string | null): string {
 }
 
 export function ticketMessageToWidgetMsg(m: VisitorTicketMessage): Msg {
+  const sortAt = m.createdAt ?? new Date().toISOString();
   const time = formatTime(m.createdAt);
   if (m.senderRole === "visitor") {
-    return { id: m.id, role: "user", text: m.text, time };
+    return { id: m.id, role: "user", text: m.text, time, sortAt };
   }
   const label =
     m.senderLabel && m.senderLabel !== "Unknown sender" && m.senderLabel !== "System"
       ? m.senderLabel
       : "Support";
-  return { id: m.id, role: "bot", text: `${label}: ${m.text}`, time };
+  return { id: m.id, role: "bot", text: `${label}: ${m.text}`, time, sortAt };
 }
 
-export function mergeFaqWithTicketMessages(faqMsgs: Msg[], ticketMsgs: Msg[]): Msg[] {
-  const localOnly = faqMsgs.filter((m) => !m.id);
-  return [...localOnly, ...ticketMsgs];
+function faqExchangeToMsgs(exchange: FaqExchange): Msg[] {
+  const base = Date.parse(exchange.askedAt) || Date.now();
+  const qAt = new Date(base).toISOString();
+  const aAt = new Date(base + 1).toISOString();
+  return [
+    {
+      role: "user",
+      text: exchange.question,
+      time: formatTime(qAt),
+      sortAt: qAt,
+      faqLocal: true,
+    },
+    {
+      role: "bot",
+      text: exchange.answer,
+      time: formatTime(aAt),
+      sortAt: aAt,
+      faqLocal: true,
+      faqForQuestion: exchange.question,
+    },
+  ];
+}
+
+function compareMsgs(a: Msg, b: Msg): number {
+  const ta = a.sortAt ?? "";
+  const tb = b.sortAt ?? "";
+  if (ta !== tb) return ta.localeCompare(tb);
+  if (a.role !== b.role) return a.role === "user" ? -1 : 1;
+  return 0;
+}
+
+/** Ticket chat + FAQ quick-help, sorted by time (visitor-only FAQ rows). */
+export function buildVisitorThread(
+  ticketMsgs: Msg[],
+  faqExchanges: FaqExchange[],
+): Msg[] {
+  const faqMsgs = faqExchanges.flatMap(faqExchangeToMsgs);
+  return [...ticketMsgs, ...faqMsgs].sort(compareMsgs);
 }
