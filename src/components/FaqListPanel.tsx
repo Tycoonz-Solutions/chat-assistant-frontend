@@ -1,6 +1,6 @@
 import React from "react";
 import { ChevronRight, List } from "lucide-react";
-import type { FAQ, ThemeSettings } from "../types/index";
+import type { FAQ, ThemeSettings } from "../../types";
 
 type Props = {
   styles: Record<string, React.CSSProperties>;

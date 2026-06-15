@@ -4,7 +4,7 @@ import InputArea from "./InputArea";
 import FaqListPanel from "./FaqListPanel";
 import HelpChip from "./HelpChip";
 import ConversationRatingPrompt from "./ConversationRatingPrompt";
-import type { FAQ, Msg, ThemeSettings } from "../types/index";
+import type { FAQ, Msg, ThemeSettings } from "../../types";
 
 const DEFAULT_GREETING = "Hi there!\nHow can we help you today?";
 

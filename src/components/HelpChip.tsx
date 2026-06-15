@@ -1,5 +1,5 @@
 import { HelpCircle, X } from "lucide-react";
-import type { ThemeSettings } from "../types/index";
+import type { ThemeSettings } from "../../types";
 
 type Props = {
   active: boolean;
