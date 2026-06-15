@@ -99,6 +99,87 @@ export async function listVisitorTicketMessages(
   return parseTicketMessages(json);
 }
 
+export type VisitorTicketSummary = {
+  id: string;
+  status: string;
+  rating: number | null;
+  ratedAt: string | null;
+  canRate: boolean;
+  hasAssignedAgent: boolean;
+};
+
+function parseVisitorTicketSummary(json: Record<string, unknown>): VisitorTicketSummary {
+  const data = json.data as Record<string, unknown> | undefined;
+  const attrs = (data?.attributes ?? {}) as Record<string, unknown>;
+  return {
+    id: String(data?.id ?? ""),
+    status: typeof attrs.status === "string" ? attrs.status : "open",
+    rating:
+      typeof attrs.rating === "number" && !Number.isNaN(attrs.rating)
+        ? attrs.rating
+        : null,
+    ratedAt: typeof attrs.ratedAt === "string" ? attrs.ratedAt : null,
+    canRate: attrs.canRate === true,
+    hasAssignedAgent: attrs.hasAssignedAgent === true,
+  };
+}
+
+export async function getVisitorTicket(
+  apiBaseUrl: string,
+  ticketId: string,
+  accessToken: string
+): Promise<VisitorTicketSummary> {
+  const base = apiBaseUrl.replace(/\/$/, "");
+  const res = await fetch(
+    `${base}/api/v1/chat-bot/auth/ticket/${encodeURIComponent(ticketId)}`,
+    {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    }
+  );
+  const json = (await res.json()) as Record<string, unknown>;
+  if (!res.ok || json.success === false) {
+    throw new Error(
+      typeof json.message === "string" && json.message
+        ? json.message
+        : `Could not load conversation (${res.status})`
+    );
+  }
+  return parseVisitorTicketSummary(json);
+}
+
+export async function postVisitorTicketRating(
+  apiBaseUrl: string,
+  ticketId: string,
+  accessToken: string,
+  rating: number,
+  comment?: string
+): Promise<VisitorTicketSummary> {
+  const base = apiBaseUrl.replace(/\/$/, "");
+  const res = await fetch(
+    `${base}/api/v1/chat-bot/auth/ticket/${encodeURIComponent(ticketId)}/rating`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({
+        rating,
+        ...(comment?.trim() ? { comment: comment.trim() } : {}),
+      }),
+    }
+  );
+  const json = (await res.json()) as Record<string, unknown>;
+  if (!res.ok || json.success === false) {
+    throw new Error(
+      typeof json.message === "string" && json.message
+        ? json.message
+        : `Could not submit rating (${res.status})`
+    );
+  }
+  return parseVisitorTicketSummary(json);
+}
+
 export async function postVisitorTicketMessage(
   apiBaseUrl: string,
   ticketId: string,

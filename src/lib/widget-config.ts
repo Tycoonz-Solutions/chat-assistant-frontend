@@ -9,10 +9,30 @@ const POSITIONS = new Set<NonNullable<ThemeSettings["position"]>>([
   "top-left",
 ]);
 
+export type WidgetCapabilities = {
+  aiChatEnabled: boolean;
+  agentSupportEnabled: boolean;
+};
+
 export type WidgetConfig = {
   appearance: Partial<ThemeSettings>;
   faqs: FAQ[];
+  capabilities: WidgetCapabilities;
 };
+
+const DEFAULT_CAPABILITIES: WidgetCapabilities = {
+  aiChatEnabled: true,
+  agentSupportEnabled: true,
+};
+
+function parseCapabilities(raw: unknown): WidgetCapabilities {
+  if (!raw || typeof raw !== "object") return DEFAULT_CAPABILITIES;
+  const c = raw as Record<string, unknown>;
+  return {
+    aiChatEnabled: c.aiChatEnabled !== false,
+    agentSupportEnabled: c.agentSupportEnabled !== false,
+  };
+}
 
 function parseFaqList(raw: unknown): FAQ[] {
   if (!Array.isArray(raw)) return [];
@@ -76,6 +96,12 @@ export async function fetchWidgetConfig(
     const status = res.status;
     const serverMsg =
       typeof json.message === "string" && json.message ? json.message : "";
+    if (status === 403) {
+      throw new Error(
+        serverMsg ||
+          "This organisation is inactive. The chat widget is not available right now."
+      );
+    }
     if (status === 401) {
       throw new Error(
         serverMsg ||
@@ -98,8 +124,11 @@ export async function fetchWidgetConfig(
   const fromMeta = parseFaqList((json.meta as { faqs?: unknown } | undefined)?.faqs);
   const fromAttrs = parseFaqList(attrs.faqs);
   const faqs = fromMeta.length > 0 ? fromMeta : fromAttrs;
+  const capabilities = parseCapabilities(
+    (json.meta as { capabilities?: unknown } | undefined)?.capabilities,
+  );
 
-  return { appearance, faqs };
+  return { appearance, faqs, capabilities };
 }
 
 /** @deprecated Use fetchWidgetConfig */

@@ -10,18 +10,24 @@ import PreChatScreen from "./components/PreChatScreen";
 import EscalateScreen from "./components/EscalateScreen";
 import type { EscalatePayload } from "./components/EscalateScreen";
 import type { FAQ, Msg, ChatFAQWidgetProps, ThemeSettings } from "../types/index";
-import { fetchWidgetConfig } from "./lib/widget-config";
 import {
+  fetchWidgetConfig,
+  type WidgetCapabilities,
+} from "./lib/widget-config";
+import {
+  getVisitorTicket,
   listVisitorTicketMessages,
   postVisitorEscalate,
   postVisitorIdentify,
   postVisitorTicketMessage,
+  postVisitorTicketRating,
+  type VisitorTicketSummary,
 } from "./widget-visitor-api";
 import {
   buildVisitorThread,
   ticketMessageToWidgetMsg,
 } from "./lib/ticket-thread-ui";
-import { appendFaqExchange, loadFaqTranscript } from "./lib/faq-transcript";
+import { appendFaqExchange, clearFaqTranscript, loadFaqTranscript } from "./lib/faq-transcript";
 import {
   loadVisitorSession,
   saveVisitorSession,
@@ -64,6 +70,15 @@ export default function ChatWidget({
   const [prechatError, setPrechatError] = useState<string | null>(null);
   const [escalateBusy, setEscalateBusy] = useState(false);
   const [remoteFaqs, setRemoteFaqs] = useState<FAQ[] | null>(null);
+  const [capabilities, setCapabilities] = useState<WidgetCapabilities>({
+    aiChatEnabled: true,
+    agentSupportEnabled: true,
+  });
+  const [ticketSummary, setTicketSummary] = useState<VisitorTicketSummary | null>(null);
+  const [ratingBusy, setRatingBusy] = useState(false);
+  const [ratingSkipped, setRatingSkipped] = useState(false);
+  const [allowResolvedReply, setAllowResolvedReply] = useState(false);
+  const [widgetUnavailable, setWidgetUnavailable] = useState<string | null>(null);
 
   const [themeSettings, setThemeSettings] = useState<ThemeSettings>({
     isDarkMode: false,
@@ -87,12 +102,24 @@ export default function ChatWidget({
     let cancelled = false;
     (async () => {
       try {
+        setWidgetUnavailable(null);
         const config = await fetchWidgetConfig(base, tok);
         if (cancelled) return;
         setThemeSettings((prev) => ({ ...prev, ...config.appearance }));
         setRemoteFaqs(config.faqs);
+        setCapabilities(config.capabilities);
       } catch (err) {
         if (cancelled) return;
+        const msg = err instanceof Error ? err.message : "";
+        if (
+          msg.includes("inactive") ||
+          msg.includes("no longer available") ||
+          msg.includes("has been removed")
+        ) {
+          setWidgetUnavailable(msg);
+          setRemoteFaqs([]);
+          return;
+        }
         setRemoteFaqs([]);
         console.warn(
           "[ChatWidget] Could not load widget config (appearance + FAQs). " +
@@ -116,11 +143,26 @@ export default function ChatWidget({
   const visitorRef = useRef(visitor);
   visitorRef.current = visitor;
 
-  const canEscalate = Boolean(apiBaseUrl?.trim() && projectToken?.trim());
+  const hasAiBackend = Boolean(sendMessage);
+  const aiChatAvailable =
+    capabilities.aiChatEnabled && hasAiBackend;
+  const canEscalate = Boolean(
+    apiBaseUrl?.trim() &&
+      projectToken?.trim() &&
+      capabilities.agentSupportEnabled,
+  );
   const activeTicketId = visitor?.ticketId ?? null;
   const visitorAccessToken = visitor?.accessToken ?? null;
 
   const ticketSyncInFlightRef = useRef(false);
+
+  const ratingSkipStorageKey = useCallback(
+    (ticketId: string) => {
+      const suffix = projectToken?.trim().slice(-12) || "default";
+      return `chat-widget-rating-skipped-${suffix}-${ticketId}`;
+    },
+    [projectToken]
+  );
 
   const syncTicketThread = useCallback(async () => {
     const base = apiBaseUrl?.trim();
@@ -131,16 +173,39 @@ export default function ChatWidget({
 
     ticketSyncInFlightRef.current = true;
     try {
-      const rows = await listVisitorTicketMessages(base, tid, token);
+      const [rows, summary] = await Promise.all([
+        listVisitorTicketMessages(base, tid, token),
+        getVisitorTicket(base, tid, token),
+      ]);
       const ticketMsgs = rows.map(ticketMessageToWidgetMsg);
       const faqExchanges = loadFaqTranscript(projectToken, tid);
       setMessages(buildVisitorThread(ticketMsgs, faqExchanges));
+      setTicketSummary(summary);
     } catch (err) {
       console.warn("[ChatWidget] Could not sync ticket messages", err);
     } finally {
       ticketSyncInFlightRef.current = false;
     }
   }, [apiBaseUrl, projectToken]);
+
+  useEffect(() => {
+    if (!activeTicketId) {
+      setTicketSummary(null);
+      setRatingSkipped(false);
+      setAllowResolvedReply(false);
+      return;
+    }
+    const skipped =
+      typeof window !== "undefined" &&
+      sessionStorage.getItem(ratingSkipStorageKey(activeTicketId)) === "1";
+    setRatingSkipped(skipped);
+  }, [activeTicketId, ratingSkipStorageKey]);
+
+  useEffect(() => {
+    if (ticketSummary?.status !== "resolved") {
+      setAllowResolvedReply(false);
+    }
+  }, [ticketSummary?.status]);
 
   useEffect(() => {
     if (!visitorGateEffective) return;
@@ -215,6 +280,13 @@ export default function ChatWidget({
     const base = apiBaseUrl?.trim();
     const tid = visitor?.ticketId;
     const token = visitor?.accessToken;
+    const awaitingRating =
+      ticketSummary?.status === "resolved" &&
+      ticketSummary?.canRate &&
+      !ratingSkipped;
+    if (awaitingRating) {
+      return;
+    }
     if (base && tid && token) {
       const body = text.trim();
       setText("");
@@ -310,7 +382,8 @@ export default function ChatWidget({
     const askedAt = new Date().toISOString();
 
     try {
-      if (base && tid && token) {
+      const ticketIsResolved = ticketSummary?.status === "resolved";
+      if (base && tid && token && !ticketIsResolved) {
         appendFaqExchange(projectToken, tid, {
           question: f.question,
           answer: f.ans,
@@ -444,6 +517,9 @@ export default function ChatWidget({
         ? `linear-gradient(90deg, ${themeSettings.primaryColor}, ${themeSettings.secondaryColor})`
         : themeSettings.primaryColor ?? "#776b00ff",
       color: "white",
+      flexShrink: 0,
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
     },
     welcomeScreen: {
       flex: 1,
@@ -451,7 +527,8 @@ export default function ChatWidget({
       flexDirection: "column" as const,
       overflow: "hidden",
       justifyContent: "start",
-      alignItems: "center",
+      alignItems: "stretch",
+      width: "100%",
     },
     welcomeHeader: {
       background: themeSettings.isGradient
@@ -461,7 +538,11 @@ export default function ChatWidget({
       color: "white",
       position: "relative" as const,
       overflow: "hidden",
-      width: "90%",
+      width: "100%",
+      flexShrink: 0,
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+      boxSizing: "border-box" as const,
     },
     faqContainer: {
       flex: 1,
@@ -505,8 +586,6 @@ export default function ChatWidget({
       color: "white",
       padding: "12px 16px",
       borderRadius: "16px 16px 4px 16px",
-      maxWidth: "75%",
-      wordWrap: "break-word" as const,
       fontSize: themeSettings?.fontSizeBase ? themeSettings?.fontSizeBase / 2 + 4 : 16,
       lineHeight: 1.5,
       animation: "slideInRight 0.3s ease",
@@ -518,8 +597,6 @@ export default function ChatWidget({
       color: "#1a1a1a",
       padding: "12px 16px",
       borderRadius: "16px 16px 16px 4px",
-      maxWidth: "75%",
-      wordWrap: "break-word" as const,
       fontSize: themeSettings?.fontSizeBase ? themeSettings?.fontSizeBase / 2 + 4 : 14,
       lineHeight: 1.5,
       animation: "slideInLeft 0.3s ease",
@@ -663,6 +740,69 @@ export default function ChatWidget({
     }
   }
 
+  const ticketResolved = ticketSummary?.status === "resolved";
+  const showRatingPrompt = Boolean(
+    ticketSummary?.canRate && !ratingSkipped && activeTicketId
+  );
+  const ratingSubmitted = ticketSummary?.rating != null;
+
+  async function handleRatingSubmit(rating: number) {
+    const base = apiBaseUrl?.trim();
+    const tid = visitorRef.current?.ticketId;
+    const token = visitorRef.current?.accessToken;
+    if (!base || !tid || !token) return;
+
+    setRatingBusy(true);
+    try {
+      const summary = await postVisitorTicketRating(base, tid, token, rating);
+      setTicketSummary(summary);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setMessages((m) => [
+        ...m,
+        { role: "bot", text: `Could not submit rating: ${msg}`, time: nowTime() },
+      ]);
+    } finally {
+      setRatingBusy(false);
+    }
+  }
+
+  function handleRatingSkip() {
+    if (!activeTicketId) return;
+    sessionStorage.setItem(ratingSkipStorageKey(activeTicketId), "1");
+    setRatingSkipped(true);
+  }
+
+  function handleStartNewConversation() {
+    const current = visitorRef.current;
+    if (!current?.email) return;
+
+    const oldTicketId = current.ticketId;
+    if (oldTicketId) {
+      clearFaqTranscript(projectToken, oldTicketId);
+    }
+
+    const profile = {
+      email: current.email,
+      name: current.name,
+      accessToken: current.accessToken,
+      ticketId: null as string | null,
+    };
+    setVisitor(profile);
+    visitorRef.current = profile;
+    saveVisitorSession(profile, projectToken);
+    setTicketSummary(null);
+    setRatingSkipped(false);
+    setAllowResolvedReply(false);
+    setMessages([]);
+    setText("");
+    setHelpOpen(false);
+  }
+
+  function handleContinueResolvedConversation() {
+    setAllowResolvedReply(true);
+  }
+
   async function onEscalateSubmit(payload: EscalatePayload) {
     const base = apiBaseUrl?.trim();
     const tok = projectToken?.trim();
@@ -714,6 +854,10 @@ export default function ChatWidget({
     }
   }
 
+  if (widgetUnavailable && apiBaseUrl?.trim() && projectToken?.trim()) {
+    return null;
+  }
+
   return (
     <>
       <style>{`
@@ -724,8 +868,20 @@ export default function ChatWidget({
         .message-row.bot { justify-content:flex-start; }
         .bot-avatar { width:36px; height:36px; border-radius:50%; flex-shrink:0; overflow:hidden; }
         .bot-avatar img { width:100%; height:100%; object-fit:cover; display:block; }
-        .message-content { display:flex; flex-direction:column; align-items:flex-start; }
-        .message-content.user { align-items:flex-end; }
+        .message-content {
+          display: flex;
+          flex-direction: column;
+          max-width: 75%;
+          min-width: 0;
+        }
+        .message-row.user .message-content { align-items: flex-end; align-self: flex-end; }
+        .message-row.bot .message-content { align-items: flex-start; }
+        .message-bubble {
+          width: fit-content;
+          max-width: 100%;
+          word-break: break-word;
+          overflow-wrap: break-word;
+        }
         @keyframes slideInRight { from{ opacity:0; transform:translateX(20px);} to{ opacity:1; transform:translateX(0);} }
         @keyframes slideInLeft  { from{ opacity:0; transform:translateX(-20px);} to{ opacity:1; transform:translateX(0);} }
         @keyframes pulse { 0%,100%{ transform:scale(1); opacity:1;} 50%{ transform:scale(1.1); opacity:0.8;} }
@@ -793,7 +949,17 @@ export default function ChatWidget({
             helpOpen={helpOpen}
             onHelpOpenChange={setHelpOpen}
             hasActiveTicket={Boolean(activeTicketId)}
+            ticketResolved={ticketResolved}
+            showRatingPrompt={showRatingPrompt}
+            ratingBusy={ratingBusy}
+            ratingSubmitted={ratingSubmitted}
+            onRatingSubmit={handleRatingSubmit}
+            onRatingSkip={handleRatingSkip}
+            onStartNewConversation={handleStartNewConversation}
+            onContinueResolvedConversation={handleContinueResolvedConversation}
+            allowResolvedReply={allowResolvedReply}
             canEscalate={canEscalate}
+            aiChatAvailable={aiChatAvailable}
             onContactSupport={() => setView("escalate")}
             placeholder={placeholder}
           />

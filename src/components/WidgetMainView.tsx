@@ -3,6 +3,7 @@ import MessageList from "./MessageList";
 import InputArea from "./InputArea";
 import FaqListPanel from "./FaqListPanel";
 import HelpChip from "./HelpChip";
+import ConversationRatingPrompt from "./ConversationRatingPrompt";
 import type { FAQ, Msg, ThemeSettings } from "../types/index";
 
 const DEFAULT_GREETING = "Hi there!\nHow can we help you today?";
@@ -30,7 +31,17 @@ type Props = {
   helpOpen: boolean;
   onHelpOpenChange: (open: boolean) => void;
   hasActiveTicket: boolean;
+  ticketResolved?: boolean;
+  showRatingPrompt?: boolean;
+  ratingBusy?: boolean;
+  ratingSubmitted?: boolean;
+  onRatingSubmit?: (rating: number) => Promise<void>;
+  onRatingSkip?: () => void;
+  onStartNewConversation?: () => void;
+  onContinueResolvedConversation?: () => void;
+  allowResolvedReply?: boolean;
   canEscalate: boolean;
+  aiChatAvailable?: boolean;
   onContactSupport?: () => void;
   placeholder: string;
 };
@@ -51,12 +62,31 @@ export default function WidgetMainView({
   helpOpen,
   onHelpOpenChange,
   hasActiveTicket,
+  ticketResolved = false,
+  showRatingPrompt = false,
+  ratingBusy = false,
+  ratingSubmitted = false,
+  onRatingSubmit,
+  onRatingSkip,
+  onStartNewConversation,
+  onContinueResolvedConversation,
+  allowResolvedReply = false,
   canEscalate,
+  aiChatAvailable = false,
   onContactSupport,
   placeholder,
 }: Props) {
   const { headline, subtitle } = splitGreeting(themeSettings.greetingMessage);
-  const showComposer = hasActiveTicket || messages.some((m) => m.role === "user");
+  const feedbackComplete = ratingSubmitted || !showRatingPrompt;
+  const showResolvedActions =
+    ticketResolved && feedbackComplete && hasActiveTicket;
+  const showComposer =
+    (!ticketResolved || allowResolvedReply) &&
+    (hasActiveTicket ||
+      messages.some((m) => m.role === "user") ||
+      aiChatAvailable);
+  const showLandingHint =
+    !hasActiveTicket && messages.length === 0 && !helpOpen;
   const isDark = themeSettings.isDarkMode;
 
   /** Input uses position:absolute globally; override so the help chip is not covered. */
@@ -97,7 +127,11 @@ export default function WidgetMainView({
               marginTop: 2,
             }}
           >
-            {hasActiveTicket ? "Continue your conversation" : headline}
+            {ticketResolved
+              ? "This conversation is resolved"
+              : hasActiveTicket
+                ? "Continue your conversation"
+                : headline}
           </div>
         </div>
         {canEscalate && onContactSupport && !hasActiveTicket ? (
@@ -130,7 +164,7 @@ export default function WidgetMainView({
           position: "relative",
         }}
       >
-        {!hasActiveTicket && messages.length === 0 && !helpOpen ? (
+        {showLandingHint ? (
           <div
             style={{
               flex: 1,
@@ -140,7 +174,7 @@ export default function WidgetMainView({
               justifyContent: "center",
               padding: 24,
               textAlign: "center",
-              gap: 12,
+              gap: 8,
               background: isDark ? "#2b2b2b" : "#fafafa",
             }}
           >
@@ -152,35 +186,94 @@ export default function WidgetMainView({
                 lineHeight: 1.5,
               }}
             >
-              {subtitle || "Use Quick help below for FAQs, or connect with our team."}
+              {subtitle ||
+                (aiChatAvailable
+                  ? "Type below to chat with AI, use Quick help for FAQs."
+                  : "Use Quick help below for FAQs.")}
             </p>
-            {canEscalate && onContactSupport ? (
-              <button
-                type="button"
-                onClick={onContactSupport}
+            {canEscalate ? (
+              <p
                 style={{
-                  border: "none",
-                  borderRadius: 999,
-                  padding: "10px 20px",
-                  fontSize: 14,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  color: "#fff",
-                  background: themeSettings.primaryColor ?? "#006D77",
+                  margin: 0,
+                  fontSize: 12,
+                  color: isDark ? "#94a3b8" : "#64748b",
                 }}
               >
-                Chat with our team
-              </button>
+                Need a person? Tap <strong>Get support</strong> above.
+              </p>
             ) : null}
           </div>
         ) : (
-          <MessageList
-            styles={layoutStyles as never}
-            messages={messages as never[]}
-            showTyping={showTyping}
-            messagesEndRef={messagesEndRef}
-            themeSettings={themeSettings}
-          />
+          <>
+            <MessageList
+              styles={layoutStyles as never}
+              messages={messages as never[]}
+              showTyping={showTyping}
+              messagesEndRef={messagesEndRef}
+              themeSettings={themeSettings}
+            />
+            {showResolvedActions && ratingSubmitted ? (
+              <p
+                style={{
+                  margin: "8px 16px 0",
+                  fontSize: 13,
+                  color: isDark ? "#86efac" : "#047857",
+                  textAlign: "center",
+                }}
+              >
+                Thanks for your feedback!
+              </p>
+            ) : null}
+            {showResolvedActions ? (
+              <div
+                style={{
+                  padding: "12px 16px 0",
+                  textAlign: "center",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 10,
+                  alignItems: "center",
+                }}
+              >
+                {!allowResolvedReply && onContinueResolvedConversation ? (
+                  <button
+                    type="button"
+                    onClick={onContinueResolvedConversation}
+                    style={{
+                      border: `1px solid ${themeSettings.primaryColor ?? "#006D77"}`,
+                      borderRadius: 999,
+                      padding: "10px 20px",
+                      fontSize: 14,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      color: themeSettings.primaryColor ?? "#006D77",
+                      background: "transparent",
+                    }}
+                  >
+                    Continue this conversation
+                  </button>
+                ) : null}
+                {onStartNewConversation ? (
+                  <button
+                    type="button"
+                    onClick={onStartNewConversation}
+                    style={{
+                      border: "none",
+                      borderRadius: 999,
+                      padding: "10px 20px",
+                      fontSize: 14,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      color: "#fff",
+                      background: themeSettings.primaryColor ?? "#006D77",
+                    }}
+                  >
+                    Start new conversation
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+          </>
         )}
 
         {helpOpen ? (
@@ -216,6 +309,15 @@ export default function WidgetMainView({
           padding: "10px 16px 0",
         }}
       >
+        {showRatingPrompt && onRatingSubmit && onRatingSkip ? (
+          <ConversationRatingPrompt
+            themeSettings={themeSettings}
+            busy={ratingBusy}
+            onSubmit={onRatingSubmit}
+            onSkip={onRatingSkip}
+          />
+        ) : null}
+
         <div style={{ marginBottom: showComposer && !helpOpen ? 10 : 0 }}>
           <HelpChip
             active={helpOpen}

@@ -40,8 +40,11 @@ export default function MessageList({
               </div>
             )}
 
-            <div className={`message-content ${isBot ? 'bot' : 'user'}`} style={{ maxWidth: '80%' }}>
-              <div style={isBot ? styles.botMessageBubble : styles.userMessageBubble}>
+            <div className={`message-content ${isBot ? 'bot' : 'user'}`}>
+              <div
+                className="message-bubble"
+                style={isBot ? styles.botMessageBubble : styles.userMessageBubble}
+              >
                 {msg.text}
               </div>
               <div style={{ ...styles.timeText, alignSelf: isBot ? 'flex-start' : 'flex-end' }}>

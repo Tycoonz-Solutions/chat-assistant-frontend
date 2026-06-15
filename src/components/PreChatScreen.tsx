@@ -44,15 +44,13 @@ export default function PreChatScreen({
 
       <div
         style={{
-          marginTop: "-30px",
-          maxHeight: "420px",
+          flex: 1,
           display: "flex",
           flexDirection: "column",
-          zIndex: 9,
-          flexGrow: 1,
-          flexShrink: 1,
-          flexBasis: "0%",
-          width: "90%",
+          minHeight: 0,
+          width: "100%",
+          padding: "0 24px 24px",
+          boxSizing: "border-box",
         }}
       >
         <div style={styles.faqContainer}>

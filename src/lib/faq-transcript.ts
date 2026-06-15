@@ -36,3 +36,11 @@ export function appendFaqExchange(
   }
   return list;
 }
+
+export function clearFaqTranscript(
+  projectToken: string | undefined,
+  ticketId: string,
+): void {
+  if (typeof window === "undefined" || !ticketId) return;
+  sessionStorage.removeItem(storageKey(projectToken, ticketId));
+}
