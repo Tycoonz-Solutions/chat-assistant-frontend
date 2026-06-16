@@ -5,9 +5,10 @@ type Props = {
   active: boolean;
   onClick: () => void;
   themeSettings: ThemeSettings;
+  disabled?: boolean;
 };
 
-export default function HelpChip({ active, onClick, themeSettings }: Props) {
+export default function HelpChip({ active, onClick, themeSettings, disabled = false }: Props) {
   const primary = themeSettings.primaryColor ?? "#006D77";
   const isDark = themeSettings.isDarkMode;
 
@@ -16,7 +17,9 @@ export default function HelpChip({ active, onClick, themeSettings }: Props) {
       type="button"
       className="widget-help-chip"
       onClick={onClick}
+      disabled={disabled}
       aria-expanded={active}
+      aria-disabled={disabled}
       aria-label={active ? "Back to messages" : "Browse quick help"}
       style={{
         display: "inline-flex",
@@ -27,7 +30,9 @@ export default function HelpChip({ active, onClick, themeSettings }: Props) {
         padding: "7px 14px",
         fontSize: 13,
         fontWeight: 600,
-        cursor: "pointer",
+        cursor: disabled ? "not-allowed" : "pointer",
+        opacity: disabled ? 0.55 : 1,
+        pointerEvents: disabled ? "none" : undefined,
         background: active ? primary : isDark ? "#333" : "#fff",
         color: active ? "#fff" : isDark ? "#e2e8f0" : "#334155",
         boxShadow: active

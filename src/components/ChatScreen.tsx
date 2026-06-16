@@ -19,12 +19,14 @@ export default function ChatScreen({
   themeSettings,
   canEscalate,
   onContactSupport,
+  interactionLocked = false,
 }: {
   styles: Record<string, React.CSSProperties>;
   title: string;
   messages: { role: string; text: string; time: string }[];
   showTyping?: boolean;
   sending?: boolean;
+  interactionLocked?: boolean;
   text: string;
   setText: (s: string) => void;
   onSend: (e?: React.FormEvent) => Promise<void> | void;
@@ -41,11 +43,13 @@ export default function ChatScreen({
           <button
             type="button"
             onClick={onBack}
+            disabled={interactionLocked}
             style={{
               background: 'transparent',
               border: 'none',
               color: 'white',
-              cursor: 'pointer',
+              cursor: interactionLocked ? 'not-allowed' : 'pointer',
+              opacity: interactionLocked ? 0.55 : 1,
               borderRadius: 8,
               padding: 8,
               display: 'flex',
@@ -148,7 +152,7 @@ export default function ChatScreen({
         text={text}
         setText={setText}
         onSend={onSend}
-        loading={Boolean(showTyping || sending)}
+        loading={Boolean(showTyping || sending || interactionLocked)}
         themeSettings={themeSettings}
       />
     </div>

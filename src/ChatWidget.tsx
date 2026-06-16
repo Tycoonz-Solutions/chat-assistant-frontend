@@ -85,6 +85,26 @@ export default function ChatWidget({
   const [allowResolvedReply, setAllowResolvedReply] = useState(false);
   const [widgetUnavailable, setWidgetUnavailable] = useState<string | null>(null);
 
+  const interactionLockRef = useRef(false);
+  const [interactionLocked, setInteractionLocked] = useState(false);
+
+  const acquireInteractionLock = useCallback(() => {
+    if (interactionLockRef.current) return false;
+    interactionLockRef.current = true;
+    setInteractionLocked(true);
+    return true;
+  }, []);
+
+  const releaseInteractionLock = useCallback(() => {
+    interactionLockRef.current = false;
+    setInteractionLocked(false);
+  }, []);
+
+  const handleHelpOpenChange = useCallback((open: boolean) => {
+    if (open && interactionLockRef.current) return;
+    setHelpOpen(open);
+  }, []);
+
   const [themeSettings, setThemeSettings] = useState<ThemeSettings>({
     isDarkMode: false,
     primaryColor: "#006D77",
@@ -313,7 +333,7 @@ export default function ChatWidget({
 
   async function handleSend(e?: React.FormEvent) {
     e?.preventDefault();
-    if (!text.trim() || sending || awaitingBot) return;
+    if (!text.trim() || interactionLockRef.current) return;
 
     const base = apiBaseUrl?.trim();
     const tid = visitor?.ticketId;
@@ -325,33 +345,35 @@ export default function ChatWidget({
     if (awaitingRating) {
       return;
     }
-    if (base && tid && token) {
-      const body = text.trim();
-      setText("");
-      const userMsg: Msg = { role: "user", text: body, time: nowTime() };
-      setMessages((m) => [...m, userMsg]);
-      setSending(true);
-      try {
-        await postVisitorTicketMessage(base, tid, token, body);
-        await syncTicketThread();
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        setMessages((m) => [
-          ...m,
-          { role: "bot", text: `Could not send: ${msg}`, time: nowTime() },
-        ]);
-      } finally {
-        setSending(false);
-      }
-      return;
-    }
-
-    const userMsg: Msg = { role: "user", text: text.trim(), time: nowTime() };
-    setMessages((m) => [...m, userMsg]);
-    setText("");
-    setAwaitingBot(true);
+    if (!acquireInteractionLock()) return;
 
     try {
+      if (base && tid && token) {
+        const body = text.trim();
+        setText("");
+        const userMsg: Msg = { role: "user", text: body, time: nowTime() };
+        setMessages((m) => [...m, userMsg]);
+        setSending(true);
+        try {
+          await postVisitorTicketMessage(base, tid, token, body);
+          await syncTicketThread();
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          setMessages((m) => [
+            ...m,
+            { role: "bot", text: `Could not send: ${msg}`, time: nowTime() },
+          ]);
+        } finally {
+          setSending(false);
+        }
+        return;
+      }
+
+      const userMsg: Msg = { role: "user", text: text.trim(), time: nowTime() };
+      setMessages((m) => [...m, userMsg]);
+      setText("");
+      setAwaitingBot(true);
+
       let reply: string;
       const fromFaq = matchFaqAnswer(userMsg.text);
       if (fromFaq) {
@@ -403,10 +425,14 @@ export default function ChatWidget({
       }
     } finally {
       setAwaitingBot(false);
+      releaseInteractionLock();
     }
   }
 
   async function handleSelectFAQ(f: FAQ) {
+    if (interactionLockRef.current) return;
+    if (!acquireInteractionLock()) return;
+
     if (visitorGateEffective) {
       setHelpOpen(false);
     } else {
@@ -454,10 +480,12 @@ export default function ChatWidget({
       ]);
     } finally {
       setAwaitingBot(false);
+      releaseInteractionLock();
     }
   }
 
   function handleBackToFAQs() {
+    if (interactionLockRef.current) return;
     if (visitorGateEffective) {
       setHelpOpen(true);
     } else {
@@ -985,7 +1013,8 @@ export default function ChatWidget({
             faqs={faqs}
             onSelectFAQ={handleSelectFAQ}
             helpOpen={helpOpen}
-            onHelpOpenChange={setHelpOpen}
+            onHelpOpenChange={handleHelpOpenChange}
+            interactionLocked={interactionLocked}
             hasActiveTicket={Boolean(activeTicketId)}
             ticketResolved={ticketResolved}
             showRatingPrompt={showRatingPrompt}
@@ -1008,6 +1037,7 @@ export default function ChatWidget({
             styles={styles}
             faqs={faqs}
             onSelectFAQ={handleSelectFAQ}
+            interactionLocked={interactionLocked}
             placeholder={placeholder}
             text={text}
             setText={setText}
@@ -1033,6 +1063,7 @@ export default function ChatWidget({
             setText={setText}
             onSend={handleSend}
             onBack={handleBackToFAQs}
+            interactionLocked={interactionLocked}
             messagesEndRef={messagesEndRef as unknown as React.RefObject<HTMLDivElement>}
             themeSettings={themeSettings}
             canEscalate={canEscalate}

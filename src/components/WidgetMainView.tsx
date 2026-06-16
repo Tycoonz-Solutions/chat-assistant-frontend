@@ -30,6 +30,7 @@ type Props = {
   onSelectFAQ: (f: FAQ) => void;
   helpOpen: boolean;
   onHelpOpenChange: (open: boolean) => void;
+  interactionLocked?: boolean;
   hasActiveTicket: boolean;
   ticketResolved?: boolean;
   showRatingPrompt?: boolean;
@@ -61,6 +62,7 @@ export default function WidgetMainView({
   onSelectFAQ,
   helpOpen,
   onHelpOpenChange,
+  interactionLocked = false,
   hasActiveTicket,
   ticketResolved = false,
   showRatingPrompt = false,
@@ -138,6 +140,7 @@ export default function WidgetMainView({
           <button
             type="button"
             onClick={onContactSupport}
+            disabled={interactionLocked}
             style={{
               flexShrink: 0,
               background: "rgba(255,255,255,0.2)",
@@ -147,7 +150,8 @@ export default function WidgetMainView({
               padding: "8px 14px",
               fontSize: 12,
               fontWeight: 600,
-              cursor: "pointer",
+              cursor: interactionLocked ? "not-allowed" : "pointer",
+              opacity: interactionLocked ? 0.55 : 1,
             }}
           >
             Get support
@@ -295,6 +299,7 @@ export default function WidgetMainView({
               faqs={faqs}
               themeSettings={themeSettings}
               onSelectFAQ={onSelectFAQ}
+              disabled={interactionLocked}
               compact
             />
           </div>
@@ -321,6 +326,7 @@ export default function WidgetMainView({
         <div style={{ marginBottom: showComposer && !helpOpen ? 10 : 0 }}>
           <HelpChip
             active={helpOpen}
+            disabled={interactionLocked && !helpOpen}
             onClick={() => onHelpOpenChange(!helpOpen)}
             themeSettings={themeSettings}
           />
@@ -332,7 +338,7 @@ export default function WidgetMainView({
             text={text}
             setText={setText}
             onSend={onSend}
-            loading={Boolean(showTyping || sending)}
+            loading={Boolean(showTyping || sending || interactionLocked)}
             themeSettings={themeSettings}
           />
         ) : helpOpen ? (

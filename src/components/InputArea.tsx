@@ -27,6 +27,7 @@ export default function InputArea({
             onChange={(e) => setText(e.target.value)}
             placeholder="Type message here..."
             style={styles.input}
+            disabled={loading}
           />
           <button
             type="submit"

@@ -23,10 +23,12 @@ export default function WelcomeScreen({
   themeSettings,
   canEscalate,
   onCreateSupportTicket,
+  interactionLocked = false,
 }: {
   styles: any;
   faqs: FAQ[];
   onSelectFAQ: (f: FAQ) => void;
+  interactionLocked?: boolean;
   placeholder: string;
   text: string;
   setText: (s: string) => void;
@@ -129,8 +131,17 @@ export default function WelcomeScreen({
             {faqs.map((faq, index) => (
               <button
                 key={index}
-                style={styles.faqCard}
-                onClick={() => onSelectFAQ(faq)}
+                type="button"
+                disabled={interactionLocked}
+                style={{
+                  ...styles.faqCard,
+                  opacity: interactionLocked ? 0.55 : 1,
+                  cursor: interactionLocked ? "not-allowed" : "pointer",
+                }}
+                onClick={() => {
+                  if (interactionLocked) return;
+                  onSelectFAQ(faq);
+                }}
                 onMouseEnter={(e) => { e.currentTarget.style.border = `1px solid ${themeSettings.isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}`; }}
                 onMouseLeave={(e) => { e.currentTarget.style.border = '1px solid transparent'; }}
               >
@@ -171,10 +182,16 @@ export default function WelcomeScreen({
               onChange={(e) => setText(e.target.value)}
               placeholder={placeholder}
               style={styles.input}
+              disabled={interactionLocked}
             />
             <button
               type="submit"
-              style={styles.sendButton}
+              style={{
+                ...styles.sendButton,
+                opacity: interactionLocked ? 0.55 : 1,
+                cursor: interactionLocked ? "not-allowed" : "pointer",
+              }}
+              disabled={interactionLocked}
             >
               <Send size={18} /> Send
             </button>

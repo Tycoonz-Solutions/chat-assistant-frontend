@@ -8,6 +8,7 @@ type Props = {
   themeSettings: ThemeSettings;
   onSelectFAQ: (f: FAQ) => void;
   compact?: boolean;
+  disabled?: boolean;
 };
 
 export default function FaqListPanel({
@@ -16,6 +17,7 @@ export default function FaqListPanel({
   themeSettings,
   onSelectFAQ,
   compact = false,
+  disabled = false,
 }: Props) {
   return (
     <div
@@ -67,6 +69,7 @@ export default function FaqListPanel({
             <button
               key={`${faq.question}-${index}`}
               type="button"
+              disabled={disabled}
               style={{
                 ...styles.faqCard,
                 width: "100%",
@@ -75,10 +78,14 @@ export default function FaqListPanel({
                     ? "rgba(255, 255, 255, 0.08)"
                     : "rgba(0, 0, 0, 0.06)"
                 }`,
-                cursor: "pointer",
+                cursor: disabled ? "not-allowed" : "pointer",
+                opacity: disabled ? 0.55 : 1,
                 textAlign: "left",
               }}
-              onClick={() => onSelectFAQ(faq)}
+              onClick={() => {
+                if (disabled) return;
+                onSelectFAQ(faq);
+              }}
             >
               <div
                 style={{
