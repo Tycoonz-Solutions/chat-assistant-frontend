@@ -32,6 +32,11 @@ import {
   loadVisitorSession,
   saveVisitorSession,
 } from "./lib/visitor-session";
+import {
+  ensureVisitorSocket,
+  subscribeVisitorSocket,
+  visitorTicketSummaryFromSocket,
+} from "./lib/widget-visitor-socket";
 
 type View = "prechat" | "welcome" | "chat" | "main" | "escalate";
 
@@ -231,6 +236,39 @@ export default function ChatWidget({
     }, 12_000);
     return () => window.clearInterval(id);
   }, [open, view, activeTicketId, visitorAccessToken, syncTicketThread]);
+
+  useEffect(() => {
+    const base = apiBaseUrl?.trim();
+    const token = visitorAccessToken;
+    if (!base || !token) return;
+
+    ensureVisitorSocket(base, token);
+
+    const unsubMsg = subscribeVisitorSocket("receive-message", (payload) => {
+      const tid = visitorRef.current?.ticketId;
+      const incomingTicketId =
+        payload.ticketId != null ? String(payload.ticketId) : null;
+      if (!tid || (incomingTicketId && incomingTicketId !== tid)) return;
+      void syncTicketThread();
+    });
+
+    const unsubTicket = subscribeVisitorSocket("ticket-updated", (payload) => {
+      const tid = visitorRef.current?.ticketId;
+      if (!tid || String(payload.ticketId ?? "") !== tid) return;
+
+      const summary = visitorTicketSummaryFromSocket(payload);
+      if (summary) {
+        setTicketSummary(summary);
+      } else {
+        void syncTicketThread();
+      }
+    });
+
+    return () => {
+      unsubMsg();
+      unsubTicket();
+    };
+  }, [apiBaseUrl, visitorAccessToken, projectToken, syncTicketThread]);
 
   const collectIdentityOnEscalate = useMemo(
     () => !visitor || !visitor.email,
