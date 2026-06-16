@@ -81,7 +81,7 @@ out
 
 # Nuxt.js build / generate output
 .nuxt
-dist
+# Library build output (dist/) is committed so deploy can install from git without building.
 
 # Gatsby files
 .cache/

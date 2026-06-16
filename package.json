@@ -1,6 +1,6 @@
 {
   "name": "@fahadaliqureshi/chat-assistant-frontend",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Private React chat widget component",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -21,7 +21,7 @@
   },
   "scripts": {
     "build": "tsup src/index.ts --dts --format cjs,esm",
-    "prepare": "npm run build",
+    "prepare": "node scripts/ensure-dist.mjs",
     "prepublishOnly": "npm run build"
   },
   "peerDependencies": {
