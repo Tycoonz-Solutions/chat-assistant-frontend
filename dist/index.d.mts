@@ -62,6 +62,7 @@ type VisitorApiResult = {
 declare function postVisitorIdentify(apiBaseUrl: string, body: {
     email: string;
     name?: string;
+    projectToken?: string;
 }): Promise<VisitorApiResult>;
 declare function postVisitorEscalate(apiBaseUrl: string, body: {
     email: string;

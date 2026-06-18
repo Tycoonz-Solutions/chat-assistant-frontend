@@ -26,7 +26,7 @@ function readEnvelope(json: Record<string, unknown>): VisitorApiResult {
 
 export async function postVisitorIdentify(
   apiBaseUrl: string,
-  body: { email: string; name?: string }
+  body: { email: string; name?: string; projectToken?: string }
 ): Promise<VisitorApiResult> {
   const base = apiBaseUrl.replace(/\/$/, "");
   const res = await fetch(`${base}/api/v1/chat-bot/auth/identify`, {
@@ -35,6 +35,7 @@ export async function postVisitorIdentify(
     body: JSON.stringify({
       email: body.email.trim(),
       ...(body.name?.trim() ? { name: body.name.trim() } : {}),
+      ...(body.projectToken?.trim() ? { token: body.projectToken.trim() } : {}),
     }),
   });
   const json = (await res.json()) as Record<string, unknown>;

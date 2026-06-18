@@ -1,3 +1,5 @@
+import { widgetProjectStorageId } from "./widget-storage-id";
+
 export type StoredVisitor = {
   email: string;
   name: string;
@@ -6,8 +8,7 @@ export type StoredVisitor = {
 };
 
 function storageKey(projectToken?: string): string {
-  const suffix = projectToken?.trim().slice(-12) || "default";
-  return `chat-widget-visitor-${suffix}`;
+  return `chat-widget-visitor-${widgetProjectStorageId(projectToken)}`;
 }
 
 export function loadVisitorSession(projectToken?: string): StoredVisitor | null {
@@ -21,6 +22,11 @@ export function loadVisitorSession(projectToken?: string): StoredVisitor | null 
   } catch {
     return null;
   }
+}
+
+export function clearVisitorSession(projectToken?: string): void {
+  if (typeof window === "undefined") return;
+  sessionStorage.removeItem(storageKey(projectToken));
 }
 
 export function saveVisitorSession(

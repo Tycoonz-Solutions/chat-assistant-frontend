@@ -1,3 +1,5 @@
+import { widgetProjectStorageId } from "./widget-storage-id";
+
 export type FaqExchange = {
   question: string;
   answer: string;
@@ -5,8 +7,7 @@ export type FaqExchange = {
 };
 
 function storageKey(projectToken: string | undefined, ticketId: string): string {
-  const suffix = projectToken?.trim().slice(-12) || "default";
-  return `chat-widget-faq-${suffix}-${ticketId}`;
+  return `chat-widget-faq-${widgetProjectStorageId(projectToken)}-${ticketId}`;
 }
 
 export function loadFaqTranscript(

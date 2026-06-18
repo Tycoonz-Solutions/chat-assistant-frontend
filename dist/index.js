@@ -1567,7 +1567,8 @@ async function postVisitorIdentify(apiBaseUrl, body) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       email: body.email.trim(),
-      ...body.name?.trim() ? { name: body.name.trim() } : {}
+      ...body.name?.trim() ? { name: body.name.trim() } : {},
+      ...body.projectToken?.trim() ? { token: body.projectToken.trim() } : {}
     })
   });
   const json = await res.json();
@@ -1761,10 +1762,15 @@ function buildVisitorThread(ticketMsgs, faqExchanges) {
   return [...ticketMsgs, ...faqMsgs].sort(compareMsgs);
 }
 
+// src/lib/widget-storage-id.ts
+function widgetProjectStorageId(projectToken) {
+  const token = projectToken?.trim();
+  return token || "default";
+}
+
 // src/lib/faq-transcript.ts
 function storageKey(projectToken, ticketId) {
-  const suffix = projectToken?.trim().slice(-12) || "default";
-  return `chat-widget-faq-${suffix}-${ticketId}`;
+  return `chat-widget-faq-${widgetProjectStorageId(projectToken)}-${ticketId}`;
 }
 function loadFaqTranscript(projectToken, ticketId) {
   if (typeof window === "undefined" || !ticketId) return [];
@@ -1792,8 +1798,7 @@ function clearFaqTranscript(projectToken, ticketId) {
 
 // src/lib/visitor-session.ts
 function storageKey2(projectToken) {
-  const suffix = projectToken?.trim().slice(-12) || "default";
-  return `chat-widget-visitor-${suffix}`;
+  return `chat-widget-visitor-${widgetProjectStorageId(projectToken)}`;
 }
 function loadVisitorSession(projectToken) {
   if (typeof window === "undefined") return null;
@@ -1859,6 +1864,14 @@ function subscribeVisitorSocket(event, handler) {
     handlerSets[event].delete(handler);
   };
 }
+function disconnectVisitorSocket() {
+  socket?.disconnect();
+  socket = null;
+  currentToken = null;
+  currentBaseUrl = null;
+  handlerSets["receive-message"].clear();
+  handlerSets["ticket-updated"].clear();
+}
 function visitorTicketSummaryFromSocket(payload) {
   const ticketId = payload.ticketId != null ? String(payload.ticketId) : "";
   if (!ticketId) return null;
@@ -1889,7 +1902,7 @@ function ChatWidget({
   const [open, setOpen] = (0, import_react5.useState)(false);
   const [view, setView] = (0, import_react5.useState)(() => {
     if (!visitorGateEffective) return "welcome";
-    return loadVisitorSession(projectToken) ? "main" : "prechat";
+    return "prechat";
   });
   const [helpOpen, setHelpOpen] = (0, import_react5.useState)(false);
   const [messages, setMessages] = (0, import_react5.useState)([]);
@@ -1910,6 +1923,7 @@ function ChatWidget({
   const [ratingSkipped, setRatingSkipped] = (0, import_react5.useState)(false);
   const [allowResolvedReply, setAllowResolvedReply] = (0, import_react5.useState)(false);
   const [widgetUnavailable, setWidgetUnavailable] = (0, import_react5.useState)(null);
+  const [sessionReady, setSessionReady] = (0, import_react5.useState)(!visitorGateEffective);
   const interactionLockRef = (0, import_react5.useRef)(false);
   const [interactionLocked, setInteractionLocked] = (0, import_react5.useState)(false);
   const acquireInteractionLock = (0, import_react5.useCallback)(() => {
@@ -1988,8 +2002,7 @@ function ChatWidget({
   const ticketSyncInFlightRef = (0, import_react5.useRef)(false);
   const ratingSkipStorageKey = (0, import_react5.useCallback)(
     (ticketId) => {
-      const suffix = projectToken?.trim().slice(-12) || "default";
-      return `chat-widget-rating-skipped-${suffix}-${ticketId}`;
+      return `chat-widget-rating-skipped-${widgetProjectStorageId(projectToken)}-${ticketId}`;
     },
     [projectToken]
   );
@@ -2031,27 +2044,87 @@ function ChatWidget({
     }
   }, [ticketSummary?.status]);
   (0, import_react5.useEffect)(() => {
-    if (!visitorGateEffective) return;
-    const stored = loadVisitorSession(projectToken);
-    if (!stored?.email) return;
-    setVisitor(stored);
-    visitorRef.current = stored;
-    setView("main");
-    setHelpOpen(false);
-  }, [visitorGateEffective, projectToken]);
+    if (!visitorGateEffective) {
+      setSessionReady(true);
+      return;
+    }
+    let cancelled = false;
+    setSessionReady(false);
+    async function hydrateVisitorSession() {
+      disconnectVisitorSocket();
+      setMessages([]);
+      setTicketSummary(null);
+      setRatingSkipped(false);
+      setAllowResolvedReply(false);
+      setAwaitingBot(false);
+      setText("");
+      const stored = loadVisitorSession(projectToken);
+      if (!stored?.email) {
+        if (cancelled) return;
+        setVisitor(null);
+        visitorRef.current = null;
+        setView("prechat");
+        setHelpOpen(false);
+        setSessionReady(true);
+        return;
+      }
+      const base = apiBaseUrl?.trim();
+      const tok = projectToken?.trim();
+      let profile = {
+        email: stored.email,
+        name: stored.name,
+        accessToken: stored.accessToken,
+        ticketId: null
+      };
+      if (base && tok) {
+        try {
+          const r = await postVisitorIdentify(base, {
+            email: stored.email,
+            name: stored.name || void 0,
+            projectToken: tok
+          });
+          profile = {
+            email: r.email ?? stored.email,
+            name: r.name ?? stored.name,
+            accessToken: r.accessToken,
+            ticketId: r.ticketId ?? null
+          };
+        } catch {
+          profile = {
+            email: stored.email,
+            name: stored.name,
+            accessToken: stored.accessToken,
+            ticketId: null
+          };
+        }
+      }
+      if (cancelled) return;
+      setVisitor(profile);
+      visitorRef.current = profile;
+      saveVisitorSession(profile, projectToken);
+      setView("main");
+      setHelpOpen(false);
+      setSessionReady(true);
+    }
+    void hydrateVisitorSession();
+    return () => {
+      cancelled = true;
+      disconnectVisitorSocket();
+    };
+  }, [visitorGateEffective, projectToken, apiBaseUrl]);
   (0, import_react5.useEffect)(() => {
     if (visitor) {
       saveVisitorSession(visitor, projectToken);
     }
   }, [visitor, projectToken]);
   (0, import_react5.useEffect)(() => {
-    if (!open || view !== "main" || !activeTicketId || !visitorAccessToken) return;
+    if (!sessionReady || !open || view !== "main" || !activeTicketId || !visitorAccessToken) return;
     void syncTicketThread();
     const id = window.setInterval(() => {
       void syncTicketThread();
     }, 12e3);
     return () => window.clearInterval(id);
-  }, [open, view, activeTicketId, visitorAccessToken, syncTicketThread]);
+  }, [sessionReady, open, view, activeTicketId, visitorAccessToken, syncTicketThread]);
   (0, import_react5.useEffect)(() => {
     const base = apiBaseUrl?.trim();
     const token = visitorAccessToken;
@@ -2510,7 +2583,8 @@ function ChatWidget({
     try {
       const r = await postVisitorIdentify(apiBaseUrl, {
         email: payload.email,
-        name: payload.name || void 0
+        name: payload.name || void 0,
+        projectToken: projectToken?.trim() || void 0
       });
       const profile = {
         email: r.email ?? payload.email,
