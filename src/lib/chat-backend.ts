@@ -1,6 +1,8 @@
 export type PostChatParams = {
   apiBaseUrl: string;
   message: string;
+  /** Prior turns excluding the current `message` */
+  history?: Array<{ role: "user" | "assistant"; content: string }>;
   projectToken?: string | null;
   siteName?: string;
   websiteDescription?: string;
@@ -31,6 +33,7 @@ export async function postChatCompletion(params: PostChatParams): Promise<string
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       message: params.message,
+      ...(params.history?.length ? { history: params.history } : {}),
       ...(params.projectToken
         ? { token: params.projectToken }
         : {

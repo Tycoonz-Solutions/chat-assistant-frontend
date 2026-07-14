@@ -68,11 +68,13 @@ function parseAppearanceAttributes(a: Record<string, unknown>): Partial<ThemeSet
     out.fontSizeBase = fontSizeBase as ThemeSettings["fontSizeBase"];
   }
   const position = a.position;
-  if (
-    typeof position === "string" &&
+  if (typeof a.position === "string" &&
     POSITIONS.has(position as NonNullable<ThemeSettings["position"]>)
   ) {
     out.position = position as ThemeSettings["position"];
+  }
+  if (typeof a.botAvatarUrl === "string" && a.botAvatarUrl.trim()) {
+    out.botAvatarUrl = a.botAvatarUrl.trim();
   }
   return out;
 }

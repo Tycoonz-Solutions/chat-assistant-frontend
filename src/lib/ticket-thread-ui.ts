@@ -1,6 +1,7 @@
 import type { Msg } from "../../types/index";
 import type { FaqExchange } from "./faq-transcript";
 import type { VisitorTicketMessage } from "../widget-visitor-api";
+import { parseStaffSenderName } from "./widget-display";
 
 function formatTime(iso: string | null): string {
   if (!iso) {
@@ -23,7 +24,15 @@ export function ticketMessageToWidgetMsg(m: VisitorTicketMessage): Msg {
     m.senderLabel && m.senderLabel !== "Unknown sender" && m.senderLabel !== "System"
       ? m.senderLabel
       : "Support";
-  return { id: m.id, role: "bot", text: `${label}: ${m.text}`, time, sortAt };
+  return {
+    id: m.id,
+    role: "bot",
+    text: m.text,
+    senderName: parseStaffSenderName(label),
+    isStaff: true,
+    time,
+    sortAt,
+  };
 }
 
 function faqExchangeToMsgs(exchange: FaqExchange): Msg[] {

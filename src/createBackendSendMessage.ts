@@ -1,4 +1,5 @@
 import { postChatCompletion } from "./lib/chat-backend";
+import type { ChatHistoryTurn } from "../types/index";
 
 export type CreateBackendSendMessageOptions = {
   apiBaseUrl: string;
@@ -12,11 +13,12 @@ export type CreateBackendSendMessageOptions = {
  */
 export function createBackendSendMessage(
   opts: CreateBackendSendMessageOptions
-): (message: string) => Promise<string> {
-  return (message: string) =>
+): (message: string, history?: ChatHistoryTurn[]) => Promise<string> {
+  return (message: string, history?: ChatHistoryTurn[]) =>
     postChatCompletion({
       apiBaseUrl: opts.apiBaseUrl,
       message,
+      history,
       projectToken: opts.projectToken,
       siteName: opts.siteName,
       websiteDescription: opts.websiteDescription,

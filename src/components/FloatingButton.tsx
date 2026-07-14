@@ -6,15 +6,18 @@ export default function FloatingButton({
   open,
   setOpen,
   styles,
-  themeSettings
+  themeSettings,
+  className,
 }: {
   open: boolean;
   setOpen: (v: boolean | ((s: boolean) => boolean)) => void;
   styles: any;
   themeSettings: ThemeSettings;
+  className?: string;
 }) {
   return (
     <button
+      className={className}
       style={styles.floatingButton}
       onClick={() => setOpen((s: boolean) => !s)}
       onMouseEnter={(e) => {

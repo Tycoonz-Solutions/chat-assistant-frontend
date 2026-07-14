@@ -4,11 +4,16 @@ type FAQ = {
     question: string;
     ans: string;
 };
+/** Prior turns for multi-turn AI chat (OpenAI roles). */
+type ChatHistoryTurn = {
+    role: "user" | "assistant";
+    content: string;
+};
 interface ChatFAQWidgetProps {
     title?: string;
     faqs?: FAQ[];
     placeholder?: string;
-    sendMessage?: (msg: string) => Promise<string> | string;
+    sendMessage?: (msg: string, history?: ChatHistoryTurn[]) => Promise<string> | string;
     apiBaseUrl?: string;
     projectToken?: string;
     visitorGate?: boolean;
@@ -23,6 +28,8 @@ interface ThemeSettings {
     isGradient: boolean;
     primaryColor: string;
     position?: "bottom-right" | "bottom-left" | "top-right" | "top-left";
+    /** Project logo or custom bot avatar path from widget config */
+    botAvatarUrl?: string | null;
 }
 
 declare function ChatWidget({ title, faqs: faqsProp, placeholder, sendMessage, apiBaseUrl, projectToken, visitorGate, themeSettings: themeSettingsProp, }: ChatFAQWidgetProps): react_jsx_runtime.JSX.Element | null;
@@ -36,11 +43,16 @@ type CreateBackendSendMessageOptions = {
 /**
  * Factory for {@link ChatFAQWidgetProps.sendMessage} — wires the widget to your Express `POST /api/v1/chat`.
  */
-declare function createBackendSendMessage(opts: CreateBackendSendMessageOptions): (message: string) => Promise<string>;
+declare function createBackendSendMessage(opts: CreateBackendSendMessageOptions): (message: string, history?: ChatHistoryTurn[]) => Promise<string>;
 
 type PostChatParams = {
     apiBaseUrl: string;
     message: string;
+    /** Prior turns excluding the current `message` */
+    history?: Array<{
+        role: "user" | "assistant";
+        content: string;
+    }>;
     projectToken?: string | null;
     siteName?: string;
     websiteDescription?: string;

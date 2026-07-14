@@ -1,29 +1,37 @@
 // components/chat-widget/components/MessageList.tsx
 import React from 'react';
 import type { ThemeSettings } from '../../types';
+import { DEFAULT_BOT_AVATAR, widgetBotAvatarUrl } from '../lib/widget-display';
+import { widgetBodyFontSize } from '../lib/widget-font-size';
 
 export default function MessageList({
   styles,
   messages,
   showTyping = false,
   messagesEndRef,
-  themeSettings
+  themeSettings,
+  apiBaseUrl,
+  hideEmptyPlaceholder = false,
 }: {
   styles: any;
   messages: any[];
   /** Bot/FAQ is generating a reply — not used when waiting on a live agent */
   showTyping?: boolean;
   messagesEndRef: React.RefObject<HTMLDivElement>;
-  themeSettings: ThemeSettings
+  themeSettings: ThemeSettings;
+  apiBaseUrl?: string;
+  hideEmptyPlaceholder?: boolean;
 }) {
   const nowTime = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const avatarSrc = widgetBotAvatarUrl(apiBaseUrl, themeSettings.botAvatarUrl);
+
   return (
     <div style={styles.messagesArea} className="hide-scrollbar">
-      {messages.length === 0 && (
+      {messages.length === 0 && !hideEmptyPlaceholder && (
         <div style={{
           textAlign: 'center',
           color: themeSettings?.isDarkMode ? "#fff" : '#718096',
-          fontSize: themeSettings?.fontSizeBase ? themeSettings?.fontSizeBase / 2 + 4 : 14,
+          fontSize: widgetBodyFontSize(themeSettings?.fontSizeBase),
           padding: '40px 20px',
         }}>
           Start a conversation...
@@ -32,15 +40,38 @@ export default function MessageList({
 
       {messages.map((msg, idx) => {
         const isBot = msg.role === 'bot';
+        const showStaffName = isBot && msg.isStaff && msg.senderName;
         return (
           <div key={msg.id ?? `local-${idx}`} className={`message-row ${isBot ? 'bot' : 'user'}`}>
             {isBot && (
               <div className="bot-avatar" aria-hidden>
-                <img src="https://i.pravatar.cc/150?img=32" alt="bot avatar" />
+                <img
+                  src={avatarSrc}
+                  alt=""
+                  onError={(e) => {
+                    const img = e.currentTarget;
+                    if (img.dataset.fallback === "1") return;
+                    img.dataset.fallback = "1";
+                    img.src = DEFAULT_BOT_AVATAR;
+                  }}
+                />
               </div>
             )}
 
             <div className={`message-content ${isBot ? 'bot' : 'user'}`}>
+              {showStaffName ? (
+                <div
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: themeSettings?.isDarkMode ? '#e2e8f0' : '#334155',
+                    marginBottom: 4,
+                    lineHeight: 1.3,
+                  }}
+                >
+                  {msg.senderName}
+                </div>
+              ) : null}
               <div
                 className="message-bubble"
                 style={isBot ? styles.botMessageBubble : styles.userMessageBubble}
@@ -63,7 +94,7 @@ export default function MessageList({
           alignSelf: 'flex-start',
         }}>
           <div className="bot-avatar" aria-hidden>
-            <img src="https://i.pravatar.cc/150?img=32" alt="bot avatar" />
+            <img src={avatarSrc} alt="" />
           </div>
           <div style={{
             background: themeSettings?.isDarkMode ? '#383737ff' : '#d1e7e8',

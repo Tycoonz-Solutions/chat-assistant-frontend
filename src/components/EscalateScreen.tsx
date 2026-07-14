@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import type { ThemeSettings } from "../../types/index";
+import { widgetFormFontSize, widgetHeaderSubFontSize } from "../lib/widget-font-size";
 
 export type EscalatePayload = {
   summary: string;
@@ -32,6 +33,8 @@ export default function EscalateScreen({
   const [summary, setSummary] = useState("");
   const [email, setEmail] = useState(initialEmail ?? "");
   const [name, setName] = useState(initialName ?? "");
+  const formFontSize = widgetFormFontSize(themeSettings.fontSizeBase);
+  const headerSubSize = widgetHeaderSubFontSize(themeSettings.fontSizeBase);
 
   return (
     <div style={styles.chatScreen}>
@@ -67,9 +70,7 @@ export default function EscalateScreen({
             </div>
             <div
               style={{
-                fontSize: themeSettings?.fontSizeBase
-                  ? themeSettings.fontSizeBase / 2 - 2
-                  : 12,
+                fontSize: headerSubSize,
                 opacity: 0.9,
               }}
             >
@@ -87,7 +88,13 @@ export default function EscalateScreen({
           color: themeSettings?.isDarkMode ? "#f1f5f9" : "#1e293b",
         }}
       >
-        <p style={{ margin: "0 0 12px", fontSize: 14, lineHeight: 1.5 }}>
+        <p
+          style={{
+            margin: "0 0 12px",
+            fontSize: formFontSize,
+            lineHeight: 1.5,
+          }}
+        >
           Describe your issue. Our team can continue by email if no agent is available.
         </p>
         {collectIdentity ? (
@@ -99,6 +106,7 @@ export default function EscalateScreen({
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                className="chat-widget-form-input"
                 style={styles.formInput as React.CSSProperties}
                 placeholder="you@example.com"
               />
@@ -108,6 +116,7 @@ export default function EscalateScreen({
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                className="chat-widget-form-input"
                 style={styles.formInput as React.CSSProperties}
                 placeholder="Your name"
               />
@@ -118,10 +127,12 @@ export default function EscalateScreen({
           value={summary}
           onChange={(e) => setSummary(e.target.value)}
           rows={6}
+          className="chat-widget-form-input"
           style={{
             ...(styles.formTextarea as React.CSSProperties),
             width: "100%",
-            minHeight: 120,
+            minHeight: 140,
+            fontSize: formFontSize,
           }}
           placeholder="What do you need help with?"
         />

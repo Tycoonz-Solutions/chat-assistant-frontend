@@ -68,6 +68,7 @@ export default function LoginForm({
             <div style={{ marginBottom: 12 }}>
               <label style={styles.formLabel as React.CSSProperties}>Name (optional):</label>
               <input
+                className="chat-widget-form-input"
                 style={styles.formInput as React.CSSProperties}
                 placeholder="Enter your name"
                 value={name}
@@ -78,6 +79,7 @@ export default function LoginForm({
             <div style={{ marginBottom: 12 }}>
               <label style={styles.formLabel as React.CSSProperties}>Email Address:</label>
               <input
+                className="chat-widget-form-input"
                 style={styles.formInput as React.CSSProperties}
                 placeholder="Enter email address"
                 type="email"
@@ -90,6 +92,7 @@ export default function LoginForm({
             <div style={{ marginBottom: 16 }}>
               <label style={styles.formLabel as React.CSSProperties}>Query:</label>
               <textarea
+                className="chat-widget-form-input"
                 style={styles.formTextarea as React.CSSProperties}
                 placeholder="Enter your query"
                 value={query}

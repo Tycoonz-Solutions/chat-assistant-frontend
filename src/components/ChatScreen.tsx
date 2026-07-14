@@ -20,6 +20,7 @@ export default function ChatScreen({
   canEscalate,
   onContactSupport,
   interactionLocked = false,
+  apiBaseUrl,
 }: {
   styles: Record<string, React.CSSProperties>;
   title: string;
@@ -35,6 +36,7 @@ export default function ChatScreen({
   themeSettings: ThemeSettings;
   canEscalate?: boolean;
   onContactSupport?: () => void;
+  apiBaseUrl?: string;
 }) {
   return (
     <div style={styles.chatScreen}>
@@ -117,6 +119,7 @@ export default function ChatScreen({
         showTyping={showTyping}
         messagesEndRef={messagesEndRef}
         themeSettings={themeSettings}
+        apiBaseUrl={apiBaseUrl}
       />
 
       {canEscalate && onContactSupport ? (

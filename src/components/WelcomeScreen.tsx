@@ -2,15 +2,7 @@
 import React from "react";
 import { List, ChevronRight, Send, type LucideIcon } from "lucide-react";
 import type { FAQ, ThemeSettings } from "../../types/index";
-
-const DEFAULT_GREETING = "Hi there!\nAI chat powered by our team - how can we assist you today?";
-
-function splitGreetingMessage(raw: string | undefined): { headline: string; subtitle: string } {
-  const t = (raw ?? "").trim() || DEFAULT_GREETING;
-  const idx = t.indexOf("\n");
-  if (idx === -1) return { headline: t, subtitle: "" };
-  return { headline: t.slice(0, idx).trim(), subtitle: t.slice(idx + 1).trim() };
-}
+import { splitGreetingMessage } from "../lib/greeting-message";
 
 export default function WelcomeScreen({
   styles,
@@ -40,7 +32,7 @@ export default function WelcomeScreen({
   const { headline, subtitle } = splitGreetingMessage(themeSettings.greetingMessage);
   return (
     <div style={styles.welcomeScreen}>
-      <div style={styles.welcomeHeader}>
+      <div style={styles.welcomeHeader} className="chat-widget-welcome-header">
         <div style={{ position: 'relative', zIndex: 1 }}>
           <h2 style={{ margin: 0, fontSize: themeSettings?.fontSizeBase, fontWeight: 700, marginBottom: 8 }}>
             {headline}
@@ -80,26 +72,27 @@ export default function WelcomeScreen({
         </div>
       ) : null}
 
-      <div style={{
-        marginTop: '-30px',
-        maxHeight: '404px',
-        display: 'flex',
-        flexDirection: 'column' as const,
-        zIndex: 9,
-        flexGrow: 1,
-        flexShrink: 1,
-        flexBasis: '0%',
-        width: '90%',
-      }}>
+      <div
+        style={{
+          flex: 1,
+          minHeight: 0,
+          display: "flex",
+          flexDirection: "column" as const,
+          zIndex: 1,
+          width: "90%",
+          marginTop: -24,
+          overflow: "hidden",
+        }}
+      >
 
-        <div style={styles.faqContainer} >
+        <div style={styles.faqContainer} className="chat-widget-faq-container">
           <div style={{
             display: 'flex',
             alignItems: 'center',
             gap: 8,
-            marginBottom: 16,
+            marginBottom: 12,
             padding: '0 4px',
-            height: '7%',
+            flexShrink: 0,
           }}>
             {themeSettings.isGradient
               ? <GradientIcon themeSettings={themeSettings} />
@@ -110,9 +103,17 @@ export default function WelcomeScreen({
             </h3>
           </div>
 
-          <div className="hide-scrollbar" style={{
-            display: 'flex', flexDirection: 'column', gap: 4, height: '88%', overflowY: 'auto' as const,
-          }}>
+          <div
+            className="hide-scrollbar"
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 4,
+              flex: 1,
+              minHeight: 0,
+              overflowY: "auto" as const,
+            }}
+          >
             {faqs.length === 0 ? (
               <p
                 style={{
@@ -181,6 +182,7 @@ export default function WelcomeScreen({
               value={text}
               onChange={(e) => setText(e.target.value)}
               placeholder={placeholder}
+              className="chat-widget-input"
               style={styles.input}
               disabled={interactionLocked}
             />

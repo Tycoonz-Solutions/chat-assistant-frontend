@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import type { ThemeSettings } from "../../types/index";
+import { splitGreetingMessage } from "../lib/greeting-message";
 
 export default function PreChatScreen({
   styles,
@@ -14,35 +15,52 @@ export default function PreChatScreen({
 }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const { headline, subtitle } = splitGreetingMessage(themeSettings.greetingMessage);
+  const headerFontSize = themeSettings?.fontSizeBase ?? 28;
+  const bodyFontSize = headerFontSize / 2;
 
   return (
     <div style={styles.welcomeScreen}>
-      <div style={styles.welcomeHeader}>
+      <div style={styles.welcomeHeader} className="chat-widget-welcome-header">
         <div style={{ position: "relative", zIndex: 1 }}>
           <h2
             style={{
               margin: 0,
-              fontSize: themeSettings?.fontSizeBase ?? 28,
+              fontSize: headerFontSize,
               fontWeight: 700,
               marginBottom: 8,
             }}
           >
-            Before we start
+            {headline}
           </h2>
-          <p
-            style={{
-              margin: 0,
-              fontSize: (themeSettings?.fontSizeBase ?? 28) / 2,
-              opacity: 0.95,
-              lineHeight: 1.5,
-            }}
-          >
-            Tell us who you are so we can help and follow up by email if needed.
-          </p>
+          {subtitle ? (
+            <p
+              style={{
+                margin: 0,
+                fontSize: bodyFontSize,
+                opacity: 0.95,
+                lineHeight: 1.5,
+              }}
+            >
+              {subtitle}
+            </p>
+          ) : (
+            <p
+              style={{
+                margin: 0,
+                fontSize: bodyFontSize,
+                opacity: 0.95,
+                lineHeight: 1.5,
+              }}
+            >
+              Tell us who you are so we can help and follow up by email if needed.
+            </p>
+          )}
         </div>
       </div>
 
       <div
+        className="chat-widget-prechat-body"
         style={{
           flex: 1,
           display: "flex",
@@ -53,7 +71,7 @@ export default function PreChatScreen({
           boxSizing: "border-box",
         }}
       >
-        <div style={styles.faqContainer}>
+        <div style={styles.faqContainer} className="chat-widget-faq-container">
           <form
             onSubmit={async (e) => {
               e.preventDefault();
@@ -64,6 +82,7 @@ export default function PreChatScreen({
             <div style={{ marginBottom: 12 }}>
               <label style={styles.formLabel as React.CSSProperties}>Name</label>
               <input
+                className="chat-widget-form-input"
                 style={styles.formInput as React.CSSProperties}
                 placeholder="Your name"
                 value={name}
@@ -74,6 +93,7 @@ export default function PreChatScreen({
             <div style={{ marginBottom: 16 }}>
               <label style={styles.formLabel as React.CSSProperties}>Email</label>
               <input
+                className="chat-widget-form-input"
                 style={styles.formInput as React.CSSProperties}
                 placeholder="you@example.com"
                 type="email"

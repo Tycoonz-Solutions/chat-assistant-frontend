@@ -26,6 +26,7 @@ export default function InputArea({
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder="Type message here..."
+            className="chat-widget-input"
             style={styles.input}
             disabled={loading}
           />

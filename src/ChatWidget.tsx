@@ -38,7 +38,15 @@ import {
   subscribeVisitorSocket,
   visitorTicketSummaryFromSocket,
 } from "./lib/widget-visitor-socket";
+import {
+  AI_CHAT_UNAVAILABLE_MESSAGE,
+  userFacingChatError,
+} from "./lib/chat-messages";
+import { widgetFormFontSize } from "./lib/widget-font-size";
+import { widgetPositionClass } from "./lib/widget-position";
+import { dismissTicket, isTicketDismissed } from "./lib/dismissed-tickets";
 import { widgetProjectStorageId } from "./lib/widget-storage-id";
+import { hasWidgetApiBase, resolveWidgetApiBase } from "./lib/widget-api-base";
 
 type View = "prechat" | "welcome" | "chat" | "main" | "escalate";
 
@@ -59,7 +67,10 @@ export default function ChatWidget({
   visitorGate,
   themeSettings: themeSettingsProp,
 }: ChatFAQWidgetProps) {
-  const gateDefault = Boolean(apiBaseUrl?.trim() && projectToken?.trim());
+  // Empty string = same-origin (proxy). Undefined = no backend configured.
+  const apiBase = resolveWidgetApiBase(apiBaseUrl);
+  const hasApi = hasWidgetApiBase(apiBaseUrl);
+  const gateDefault = Boolean(hasApi && projectToken?.trim());
   const visitorGateEffective = visitorGate !== undefined ? visitorGate : gateDefault;
 
   const [open, setOpen] = useState(false);
@@ -87,6 +98,8 @@ export default function ChatWidget({
   const [allowResolvedReply, setAllowResolvedReply] = useState(false);
   const [widgetUnavailable, setWidgetUnavailable] = useState<string | null>(null);
   const [sessionReady, setSessionReady] = useState(!visitorGateEffective);
+  /** Open ticket from identify shouldn't skip FAQ/AI home — only enter thread after resume/escalate. */
+  const [inTicketThread, setInTicketThread] = useState(false);
 
   const interactionLockRef = useRef(false);
   const [interactionLocked, setInteractionLocked] = useState(false);
@@ -122,18 +135,24 @@ export default function ChatWidget({
     setThemeSettings((prev) => ({ ...prev, ...themeSettingsProp }));
   }, [themeSettingsProp]);
 
+  const themeSettingsPropRef = useRef(themeSettingsProp);
+  themeSettingsPropRef.current = themeSettingsProp;
+
   useEffect(() => {
-    const base = apiBaseUrl?.trim();
     const tok = projectToken?.trim();
-    if (!base || !tok) return;
+    if (!hasApi || apiBase === undefined || !tok) return;
 
     let cancelled = false;
     (async () => {
       try {
         setWidgetUnavailable(null);
-        const config = await fetchWidgetConfig(base, tok);
+        const config = await fetchWidgetConfig(apiBase, tok);
         if (cancelled) return;
-        setThemeSettings((prev) => ({ ...prev, ...config.appearance }));
+        setThemeSettings((prev) => ({
+          ...prev,
+          ...config.appearance,
+          ...(themeSettingsPropRef.current ?? {}),
+        }));
         setRemoteFaqs(config.faqs);
         setCapabilities(config.capabilities);
       } catch (err) {
@@ -159,7 +178,7 @@ export default function ChatWidget({
     return () => {
       cancelled = true;
     };
-  }, [apiBaseUrl, projectToken]);
+  }, [apiBase, hasApi, projectToken]);
 
   const faqs = useMemo(() => {
     if (faqsProp && faqsProp.length > 0) return faqsProp;
@@ -174,12 +193,18 @@ export default function ChatWidget({
   const hasAiBackend = Boolean(sendMessage);
   const aiChatAvailable =
     capabilities.aiChatEnabled && hasAiBackend;
-  const canEscalate = Boolean(
-    apiBaseUrl?.trim() &&
-      projectToken?.trim() &&
-      capabilities.agentSupportEnabled,
-  );
   const activeTicketId = visitor?.ticketId ?? null;
+  const viewingTicketThread = Boolean(activeTicketId && inTicketThread);
+  const resumableTicketId =
+    activeTicketId && !inTicketThread ? activeTicketId : null;
+  // One open ticket at a time — no second escalate while one exists.
+  const canEscalate = Boolean(
+    hasApi &&
+      projectToken?.trim() &&
+      capabilities.agentSupportEnabled &&
+      !activeTicketId,
+  );
+
   const visitorAccessToken = visitor?.accessToken ?? null;
 
   const ticketSyncInFlightRef = useRef(false);
@@ -192,17 +217,16 @@ export default function ChatWidget({
   );
 
   const syncTicketThread = useCallback(async () => {
-    const base = apiBaseUrl?.trim();
     const tid = visitorRef.current?.ticketId;
     const token = visitorRef.current?.accessToken;
-    if (!base || !tid || !token) return;
+    if (apiBase === undefined || !tid || !token) return;
     if (ticketSyncInFlightRef.current) return;
 
     ticketSyncInFlightRef.current = true;
     try {
       const [rows, summary] = await Promise.all([
-        listVisitorTicketMessages(base, tid, token),
-        getVisitorTicket(base, tid, token),
+        listVisitorTicketMessages(apiBase, tid, token),
+        getVisitorTicket(apiBase, tid, token),
       ]);
       const ticketMsgs = rows.map(ticketMessageToWidgetMsg);
       const faqExchanges = loadFaqTranscript(projectToken, tid);
@@ -213,7 +237,7 @@ export default function ChatWidget({
     } finally {
       ticketSyncInFlightRef.current = false;
     }
-  }, [apiBaseUrl, projectToken]);
+  }, [apiBase, projectToken]);
 
   useEffect(() => {
     if (!activeTicketId) {
@@ -249,6 +273,7 @@ export default function ChatWidget({
       setTicketSummary(null);
       setRatingSkipped(false);
       setAllowResolvedReply(false);
+      setInTicketThread(false);
       setAwaitingBot(false);
       setText("");
 
@@ -263,7 +288,6 @@ export default function ChatWidget({
         return;
       }
 
-      const base = apiBaseUrl?.trim();
       const tok = projectToken?.trim();
       let profile: VisitorProfile = {
         email: stored.email,
@@ -272,9 +296,9 @@ export default function ChatWidget({
         ticketId: null,
       };
 
-      if (base && tok) {
+      if (apiBase !== undefined && tok) {
         try {
-          const r = await postVisitorIdentify(base, {
+          const r = await postVisitorIdentify(apiBase, {
             email: stored.email,
             name: stored.name || undefined,
             projectToken: tok,
@@ -285,6 +309,12 @@ export default function ChatWidget({
             accessToken: r.accessToken,
             ticketId: r.ticketId ?? null,
           };
+          if (
+            profile.ticketId &&
+            isTicketDismissed(projectToken, profile.ticketId)
+          ) {
+            profile.ticketId = null;
+          }
         } catch {
           profile = {
             email: stored.email,
@@ -299,6 +329,9 @@ export default function ChatWidget({
       setVisitor(profile);
       visitorRef.current = profile;
       saveVisitorSession(profile, projectToken);
+      // Always land on FAQ / AI home; resume open tickets via banner.
+      setInTicketThread(false);
+      setMessages([]);
       setView("main");
       setHelpOpen(false);
       setSessionReady(true);
@@ -310,7 +343,7 @@ export default function ChatWidget({
       cancelled = true;
       disconnectVisitorSocket();
     };
-  }, [visitorGateEffective, projectToken, apiBaseUrl]);
+  }, [visitorGateEffective, projectToken, apiBase]);
 
   useEffect(() => {
     if (visitor) {
@@ -319,20 +352,19 @@ export default function ChatWidget({
   }, [visitor, projectToken]);
 
   useEffect(() => {
-    if (!sessionReady || !open || view !== "main" || !activeTicketId || !visitorAccessToken) return;
+    if (!sessionReady || !open || view !== "main" || !viewingTicketThread || !visitorAccessToken) return;
     void syncTicketThread();
     const id = window.setInterval(() => {
       void syncTicketThread();
     }, 12_000);
     return () => window.clearInterval(id);
-  }, [sessionReady, open, view, activeTicketId, visitorAccessToken, syncTicketThread]);
+  }, [sessionReady, open, view, viewingTicketThread, visitorAccessToken, syncTicketThread]);
 
   useEffect(() => {
-    const base = apiBaseUrl?.trim();
     const token = visitorAccessToken;
-    if (!base || !token) return;
+    if (apiBase === undefined || !apiBase || !token) return;
 
-    ensureVisitorSocket(base, token);
+    ensureVisitorSocket(apiBase, token);
 
     const unsubMsg = subscribeVisitorSocket("receive-message", (payload) => {
       const tid = visitorRef.current?.ticketId;
@@ -349,6 +381,15 @@ export default function ChatWidget({
       const summary = visitorTicketSummaryFromSocket(payload);
       if (summary) {
         setTicketSummary(summary);
+        if (summary.status === "resolved") {
+          setAllowResolvedReply(false);
+          if (summary.canRate) {
+            setRatingSkipped(false);
+            if (typeof window !== "undefined") {
+              sessionStorage.removeItem(ratingSkipStorageKey(tid));
+            }
+          }
+        }
       } else {
         void syncTicketThread();
       }
@@ -358,7 +399,7 @@ export default function ChatWidget({
       unsubMsg();
       unsubTicket();
     };
-  }, [apiBaseUrl, visitorAccessToken, projectToken, syncTicketThread]);
+  }, [apiBase, visitorAccessToken, projectToken, syncTicketThread]);
 
   const collectIdentityOnEscalate = useMemo(
     () => !visitor || !visitor.email,
@@ -405,7 +446,8 @@ export default function ChatWidget({
     e?.preventDefault();
     if (!text.trim() || interactionLockRef.current) return;
 
-    const base = apiBaseUrl?.trim();
+    setHelpOpen(false);
+
     const tid = visitor?.ticketId;
     const token = visitor?.accessToken;
     const awaitingRating =
@@ -418,20 +460,20 @@ export default function ChatWidget({
     if (!acquireInteractionLock()) return;
 
     try {
-      if (base && tid && token) {
+      if (apiBase !== undefined && inTicketThread && tid && token) {
         const body = text.trim();
         setText("");
         const userMsg: Msg = { role: "user", text: body, time: nowTime() };
         setMessages((m) => [...m, userMsg]);
         setSending(true);
         try {
-          await postVisitorTicketMessage(base, tid, token, body);
+          await postVisitorTicketMessage(apiBase, tid, token, body);
           await syncTicketThread();
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : String(err);
           setMessages((m) => [
             ...m,
-            { role: "bot", text: `Could not send: ${msg}`, time: nowTime() },
+            { role: "bot", text: userFacingChatError(msg), time: nowTime() },
           ]);
         } finally {
           setSending(false);
@@ -448,42 +490,44 @@ export default function ChatWidget({
       const fromFaq = matchFaqAnswer(userMsg.text);
       if (fromFaq) {
         reply = fromFaq;
-      } else if (sendMessage) {
-        const r = sendMessage(userMsg.text);
+      } else if (sendMessage && aiChatAvailable) {
+        const history = messages
+          .filter((m) => (m.role === "user" || m.role === "bot") && m.text.trim())
+          .slice(-16)
+          .map((m) => ({
+            role: (m.role === "user" ? "user" : "assistant") as "user" | "assistant",
+            content: m.text.trim(),
+          }));
+        const r = sendMessage(userMsg.text, history);
         reply = typeof r === "string" ? r : await r;
       } else {
-        reply = "Sorry, I don't have an answer for that.";
+        reply = AI_CHAT_UNAVAILABLE_MESSAGE;
       }
       const botMsg: Msg = { role: "bot", text: reply, time: nowTime() };
       setMessages((m) => [...m, botMsg]);
 
       const looksUnhelpful =
-        !faqs.some(
-          (f) =>
-            userMsg.text.toLowerCase().includes(f.question.toLowerCase()) ||
-            f.question.toLowerCase().includes(userMsg.text.toLowerCase())
-        ) &&
-        (reply.toLowerCase().includes("don't have") ||
-          reply.toLowerCase().includes("do not have") ||
-          reply.toLowerCase().includes("no answer"));
+        !fromFaq &&
+        reply === AI_CHAT_UNAVAILABLE_MESSAGE;
 
       if (looksUnhelpful && canEscalate) {
         setMessages((m) => [
           ...m,
           {
             role: "bot",
-            text: "If you still need help, tap “Contact support” in the header and our team will follow up by email or live agent when available.",
+            text: "You can still reach our team using “Contact support” in the header.",
             time: nowTime(),
           },
         ]);
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
+      const reply = userFacingChatError(msg);
       setMessages((m) => [
         ...m,
-        { role: "bot", text: `Error: ${msg}`, time: nowTime() },
+        { role: "bot", text: reply, time: nowTime() },
       ]);
-      if (canEscalate) {
+      if (canEscalate && reply === AI_CHAT_UNAVAILABLE_MESSAGE) {
         setMessages((m) => [
           ...m,
           {
@@ -510,14 +554,13 @@ export default function ChatWidget({
     }
 
     setAwaitingBot(true);
-    const base = apiBaseUrl?.trim();
     const tid = visitorRef.current?.ticketId;
     const token = visitorRef.current?.accessToken;
     const askedAt = new Date().toISOString();
 
     try {
       const ticketIsResolved = ticketSummary?.status === "resolved";
-      if (base && tid && token && !ticketIsResolved) {
+      if (apiBase !== undefined && inTicketThread && tid && token && !ticketIsResolved) {
         appendFaqExchange(projectToken, tid, {
           question: f.question,
           answer: f.ans,
@@ -546,7 +589,7 @@ export default function ChatWidget({
       const msg = err instanceof Error ? err.message : String(err);
       setMessages((m) => [
         ...m,
-        { role: "bot", text: `Could not load help: ${msg}`, time: nowTime() },
+        { role: "bot", text: userFacingChatError(msg), time: nowTime() },
       ]);
     } finally {
       setAwaitingBot(false);
@@ -599,7 +642,9 @@ export default function ChatWidget({
     }
   }
   const { btnPos, panelPos } = getAnchors(widgetPosition);
+  const positionClass = widgetPositionClass(widgetPosition);
   const chatTitle = themeSettings.botName?.trim() || title;
+  const formFontSize = widgetFormFontSize(themeSettings.fontSizeBase);
 
   const styles = {
     floatingButton: {
@@ -628,10 +673,11 @@ export default function ChatWidget({
     panel: {
       position: "fixed" as const,
       ...panelPos,
-      width: 480,
+      width: "min(480px, calc(100vw - 24px))",
       height: 650,
-      maxWidth: "95vw",
-      maxHeight: "80vh",
+      maxWidth: "calc(100vw - 24px)",
+      maxHeight: "min(650px, calc(100dvh - 128px))",
+      boxSizing: "border-box" as const,
       background: themeSettings?.isDarkMode ? "#2b2b2b" : "#f8f8f8",
       borderRadius: 20,
       boxShadow: "0 20px 60px rgba(0, 0, 0, 0.2)",
@@ -662,7 +708,7 @@ export default function ChatWidget({
       display: "flex",
       flexDirection: "column" as const,
       overflow: "hidden",
-      justifyContent: "start",
+      minHeight: 0,
       alignItems: "stretch",
       width: "100%",
     },
@@ -682,7 +728,10 @@ export default function ChatWidget({
     },
     faqContainer: {
       flex: 1,
-      overflowY: "auto" as const,
+      minHeight: 0,
+      display: "flex",
+      flexDirection: "column" as const,
+      overflow: "hidden",
       padding: "24px",
       background: themeSettings?.isDarkMode ? "#2b2b2b" : "#f8f8f8",
       borderRadius: "10px",
@@ -735,6 +784,7 @@ export default function ChatWidget({
       borderRadius: "16px 16px 16px 4px",
       fontSize: themeSettings?.fontSizeBase ? themeSettings?.fontSizeBase / 2 + 4 : 14,
       lineHeight: 1.5,
+      whiteSpace: "pre-wrap" as const,
       animation: "slideInLeft 0.3s ease",
     },
     timeText: {
@@ -745,13 +795,12 @@ export default function ChatWidget({
     },
     inputArea: {
       padding: "16px 20px",
-      position: "absolute" as const,
-      bottom: 0,
+      flexShrink: 0,
       background: themeSettings?.isDarkMode ? "#2b2b2b" : "#f8f8f8",
       borderTop: `1px solid ${
         themeSettings.isDarkMode ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.1)"
       }`,
-      width: "93%",
+      width: "100%",
     },
     inputWrapper: {
       display: "flex",
@@ -791,7 +840,7 @@ export default function ChatWidget({
     },
     formLabel: {
       display: "block",
-      fontSize: themeSettings?.fontSizeBase ? themeSettings?.fontSizeBase / 2 : 14,
+      fontSize: formFontSize,
       fontWeight: 500,
       marginBottom: 4,
       color: themeSettings?.isDarkMode ? "#fff" : "#1a1a1a",
@@ -802,8 +851,8 @@ export default function ChatWidget({
         themeSettings.isDarkMode ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.1)"
       }`,
       borderRadius: 8,
-      padding: "10px 12px",
-      fontSize: themeSettings?.fontSizeBase ? themeSettings?.fontSizeBase / 2 : 12,
+      padding: "12px 14px",
+      fontSize: formFontSize,
       outline: "none",
       boxSizing: "border-box" as const,
       background: themeSettings?.isDarkMode ? "#2b2b2b" : "#fff",
@@ -815,8 +864,9 @@ export default function ChatWidget({
         themeSettings.isDarkMode ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.1)"
       }`,
       borderRadius: 8,
-      padding: "10px 12px",
-      fontSize: 12,
+      padding: "12px 14px",
+      fontSize: formFontSize,
+      lineHeight: 1.5,
       outline: "none",
       boxSizing: "border-box" as const,
       height: 96,
@@ -840,7 +890,7 @@ export default function ChatWidget({
   } as const;
 
   async function onPreChatContinue(payload: { email: string; name: string }) {
-    if (!apiBaseUrl?.trim()) {
+    if (apiBase === undefined) {
       setVisitor({ email: payload.email, name: payload.name });
       setPrechatError(null);
       setView("welcome");
@@ -849,7 +899,7 @@ export default function ChatWidget({
     setPrechatBusy(true);
     setPrechatError(null);
     try {
-      const r = await postVisitorIdentify(apiBaseUrl, {
+      const r = await postVisitorIdentify(apiBase, {
         email: payload.email,
         name: payload.name || undefined,
         projectToken: projectToken?.trim() || undefined,
@@ -863,12 +913,11 @@ export default function ChatWidget({
       setVisitor(profile);
       visitorRef.current = profile;
       saveVisitorSession(profile, projectToken);
-      if (r.ticketId && r.accessToken) {
-        await syncTicketThread();
-        setHelpOpen(false);
-      } else {
-        setHelpOpen(false);
-      }
+      // Don't auto-open an old ticket thread — keep FAQ / AI / Get support home.
+      setInTicketThread(false);
+      setMessages([]);
+      setTicketSummary(null);
+      setHelpOpen(false);
       setView("main");
     } catch (e) {
       setPrechatError(e instanceof Error ? e.message : "Could not save your details");
@@ -884,20 +933,19 @@ export default function ChatWidget({
   const ratingSubmitted = ticketSummary?.rating != null;
 
   async function handleRatingSubmit(rating: number) {
-    const base = apiBaseUrl?.trim();
     const tid = visitorRef.current?.ticketId;
     const token = visitorRef.current?.accessToken;
-    if (!base || !tid || !token) return;
+    if (apiBase === undefined || !tid || !token) return;
 
     setRatingBusy(true);
     try {
-      const summary = await postVisitorTicketRating(base, tid, token, rating);
+      const summary = await postVisitorTicketRating(apiBase, tid, token, rating);
       setTicketSummary(summary);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       setMessages((m) => [
         ...m,
-        { role: "bot", text: `Could not submit rating: ${msg}`, time: nowTime() },
+        { role: "bot", text: userFacingChatError(msg), time: nowTime() },
       ]);
     } finally {
       setRatingBusy(false);
@@ -916,6 +964,7 @@ export default function ChatWidget({
 
     const oldTicketId = current.ticketId;
     if (oldTicketId) {
+      dismissTicket(projectToken, oldTicketId);
       clearFaqTranscript(projectToken, oldTicketId);
     }
 
@@ -931,9 +980,17 @@ export default function ChatWidget({
     setTicketSummary(null);
     setRatingSkipped(false);
     setAllowResolvedReply(false);
+    setInTicketThread(false);
     setMessages([]);
     setText("");
     setHelpOpen(false);
+  }
+
+  async function handleResumeTicket() {
+    if (!activeTicketId) return;
+    setInTicketThread(true);
+    setHelpOpen(false);
+    await syncTicketThread();
   }
 
   function handleContinueResolvedConversation() {
@@ -941,16 +998,15 @@ export default function ChatWidget({
   }
 
   async function onEscalateSubmit(payload: EscalatePayload) {
-    const base = apiBaseUrl?.trim();
     const tok = projectToken?.trim();
-    if (!base || !tok) return;
+    if (apiBase === undefined || !tok) return;
 
     const email = payload.email ?? visitor?.email;
     if (!email) return;
 
     setEscalateBusy(true);
     try {
-      const r = await postVisitorEscalate(base, {
+      const r = await postVisitorEscalate(apiBase, {
         email,
         name: payload.name ?? visitor?.name,
         projectToken: tok,
@@ -969,6 +1025,7 @@ export default function ChatWidget({
         ticketId: r.ticketId ?? null,
       };
       if (r.ticketId && r.accessToken) {
+        setInTicketThread(true);
         await syncTicketThread();
       } else {
         setMessages((m) => [
@@ -982,7 +1039,7 @@ export default function ChatWidget({
       const msg = e instanceof Error ? e.message : String(e);
       setMessages((m) => [
         ...m,
-        { role: "bot", text: `Could not send request: ${msg}`, time: nowTime() },
+        { role: "bot", text: userFacingChatError(msg), time: nowTime() },
       ]);
       setHelpOpen(false);
       setView("main");
@@ -991,7 +1048,7 @@ export default function ChatWidget({
     }
   }
 
-  if (widgetUnavailable && apiBaseUrl?.trim() && projectToken?.trim()) {
+  if (widgetUnavailable && hasApi && projectToken?.trim()) {
     return null;
   }
 
@@ -1018,6 +1075,7 @@ export default function ChatWidget({
           max-width: 100%;
           word-break: break-word;
           overflow-wrap: break-word;
+          white-space: pre-wrap;
         }
         @keyframes slideInRight { from{ opacity:0; transform:translateX(20px);} to{ opacity:1; transform:translateX(0);} }
         @keyframes slideInLeft  { from{ opacity:0; transform:translateX(-20px);} to{ opacity:1; transform:translateX(0);} }
@@ -1027,9 +1085,85 @@ export default function ChatWidget({
           outline: none;
           box-shadow: none;
         }
-        @media (max-width: 600px) {
-          .chat-panel.chat-pos-br, .chat-panel.chat-pos-tr { right: 8px !important; left: auto !important; }
-          .chat-panel.chat-pos-bl, .chat-panel.chat-pos-tl { left: 8px !important; right: auto !important; }
+        .chat-panel[data-theme="dark"] .chat-widget-input::placeholder,
+        .chat-panel[data-theme="dark"] .chat-widget-form-input::placeholder {
+          color: #94a3b8;
+          opacity: 1;
+        }
+        .chat-panel[data-theme="light"] .chat-widget-input::placeholder,
+        .chat-panel[data-theme="light"] .chat-widget-form-input::placeholder {
+          color: #64748b;
+          opacity: 1;
+        }
+        .chat-widget-form-input {
+          font-size: ${formFontSize}px !important;
+          line-height: 1.5;
+        }
+        @media (max-width: 768px), (max-height: 720px) {
+          .chat-panel {
+            left: 12px !important;
+            right: 12px !important;
+            width: auto !important;
+            max-width: none !important;
+            height: auto !important;
+            max-height: none !important;
+            border-radius: 16px !important;
+          }
+          .chat-panel.chat-pos-br,
+          .chat-panel.chat-pos-bl {
+            top: calc(env(safe-area-inset-top, 0px) + 24px) !important;
+            bottom: 88px !important;
+          }
+          .chat-panel.chat-pos-tr,
+          .chat-panel.chat-pos-tl {
+            top: 88px !important;
+            bottom: calc(env(safe-area-inset-bottom, 0px) + 24px) !important;
+          }
+          .chat-widget-floating-btn {
+            width: 48px !important;
+            height: 48px !important;
+          }
+          .chat-widget-floating-btn svg {
+            width: 22px !important;
+            height: 22px !important;
+          }
+          .chat-widget-floating-btn.chat-pos-br,
+          .chat-widget-floating-btn.chat-pos-tr {
+            right: 20px !important;
+            left: auto !important;
+          }
+          .chat-widget-floating-btn.chat-pos-bl,
+          .chat-widget-floating-btn.chat-pos-tl {
+            left: 20px !important;
+            right: auto !important;
+          }
+          .chat-widget-floating-btn.chat-pos-br,
+          .chat-widget-floating-btn.chat-pos-bl {
+            bottom: 20px !important;
+            top: auto !important;
+          }
+          .chat-widget-floating-btn.chat-pos-tr,
+          .chat-widget-floating-btn.chat-pos-tl {
+            top: 20px !important;
+            bottom: auto !important;
+          }
+          .chat-widget-welcome-header {
+            padding: 28px 20px !important;
+          }
+          .chat-widget-welcome-header h2 {
+            font-size: clamp(1.25rem, 5vw, 1.75rem) !important;
+            line-height: 1.25 !important;
+          }
+          .chat-widget-welcome-header p {
+            font-size: clamp(0.8125rem, 3.5vw, 0.9375rem) !important;
+            line-height: 1.5 !important;
+          }
+          .chat-widget-prechat-body {
+            padding: 0 16px 20px !important;
+          }
+          .chat-widget-faq-container {
+            padding: 20px !important;
+          }
         }
       `}</style>
 
@@ -1038,12 +1172,14 @@ export default function ChatWidget({
         setOpen={setOpen}
         styles={styles}
         themeSettings={themeSettings}
+        className={`chat-widget-floating-btn chat-pos-${positionClass}`}
       />
 
       <div
         ref={panelRef}
         style={styles.panel}
-        className={`chat-panel chat-pos-${widgetPosition.replace(/-/g, "")}`}
+        data-theme={themeSettings.isDarkMode ? "dark" : "light"}
+        className={`chat-panel chat-pos-${positionClass}`}
       >
         {view === "prechat" && (
           <div style={{ display: "flex", flexDirection: "column", flex: 1, width: "100%" }}>
@@ -1086,9 +1222,12 @@ export default function ChatWidget({
             helpOpen={helpOpen}
             onHelpOpenChange={handleHelpOpenChange}
             interactionLocked={interactionLocked}
-            hasActiveTicket={Boolean(activeTicketId)}
-            ticketResolved={ticketResolved}
-            showRatingPrompt={showRatingPrompt}
+            hasActiveTicket={viewingTicketThread}
+            activeTicketId={viewingTicketThread ? activeTicketId : null}
+            resumableTicketId={resumableTicketId}
+            onResumeTicket={() => void handleResumeTicket()}
+            ticketResolved={viewingTicketThread && ticketResolved}
+            showRatingPrompt={viewingTicketThread && showRatingPrompt}
             ratingBusy={ratingBusy}
             ratingSubmitted={ratingSubmitted}
             onRatingSubmit={handleRatingSubmit}
@@ -1100,6 +1239,7 @@ export default function ChatWidget({
             aiChatAvailable={aiChatAvailable}
             onContactSupport={() => setView("escalate")}
             placeholder={placeholder}
+            apiBaseUrl={apiBase}
           />
         ) : null}
 
@@ -1139,6 +1279,7 @@ export default function ChatWidget({
             themeSettings={themeSettings}
             canEscalate={canEscalate}
             onContactSupport={() => setView("escalate")}
+            apiBaseUrl={apiBase}
           />
         ) : null}
 

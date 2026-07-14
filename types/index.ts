@@ -10,13 +10,22 @@ export type Msg = {
   /** FAQ quick-help row (not sent to agent ticket) */
   faqLocal?: boolean;
   faqForQuestion?: string;
+  /** Live agent / staff name shown above the message bubble */
+  senderName?: string;
+  isStaff?: boolean;
 };
+
+/** Prior turns for multi-turn AI chat (OpenAI roles). */
+export type ChatHistoryTurn = { role: "user" | "assistant"; content: string };
 
 export interface ChatFAQWidgetProps {
   title?: string;
   faqs?: FAQ[];
   placeholder?: string;
-  sendMessage?: (msg: string) => Promise<string> | string;
+  sendMessage?: (
+    msg: string,
+    history?: ChatHistoryTurn[],
+  ) => Promise<string> | string;
   apiBaseUrl?: string;
   projectToken?: string;
   visitorGate?: boolean;
@@ -32,4 +41,6 @@ export interface ThemeSettings {
   isGradient: boolean;
   primaryColor: string;
   position?: "bottom-right" | "bottom-left" | "top-right" | "top-left";
+  /** Project logo or custom bot avatar path from widget config */
+  botAvatarUrl?: string | null;
 }

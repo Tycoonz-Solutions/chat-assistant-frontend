@@ -5,6 +5,12 @@ import FaqListPanel from "./FaqListPanel";
 import HelpChip from "./HelpChip";
 import ConversationRatingPrompt from "./ConversationRatingPrompt";
 import type { FAQ, Msg, ThemeSettings } from "../../types";
+import { formatTicketId } from "../lib/formatTicketId";
+import WelcomeMessagePanel from "./WelcomeMessagePanel";
+import {
+  widgetBodyFontSize,
+  widgetHeaderSubFontSize,
+} from "../lib/widget-font-size";
 
 const DEFAULT_GREETING = "Hi there!\nHow can we help you today?";
 
@@ -32,6 +38,10 @@ type Props = {
   onHelpOpenChange: (open: boolean) => void;
   interactionLocked?: boolean;
   hasActiveTicket: boolean;
+  activeTicketId?: string | null;
+  /** Open ticket available to resume without forcing the visitor into the thread. */
+  resumableTicketId?: string | null;
+  onResumeTicket?: () => void;
   ticketResolved?: boolean;
   showRatingPrompt?: boolean;
   ratingBusy?: boolean;
@@ -45,6 +55,7 @@ type Props = {
   aiChatAvailable?: boolean;
   onContactSupport?: () => void;
   placeholder: string;
+  apiBaseUrl?: string;
 };
 
 export default function WidgetMainView({
@@ -64,6 +75,9 @@ export default function WidgetMainView({
   onHelpOpenChange,
   interactionLocked = false,
   hasActiveTicket,
+  activeTicketId = null,
+  resumableTicketId = null,
+  onResumeTicket,
   ticketResolved = false,
   showRatingPrompt = false,
   ratingBusy = false,
@@ -77,6 +91,7 @@ export default function WidgetMainView({
   aiChatAvailable = false,
   onContactSupport,
   placeholder,
+  apiBaseUrl,
 }: Props) {
   const { headline, subtitle } = splitGreeting(themeSettings.greetingMessage);
   const feedbackComplete = ratingSubmitted || !showRatingPrompt;
@@ -87,9 +102,15 @@ export default function WidgetMainView({
     (hasActiveTicket ||
       messages.some((m) => m.role === "user") ||
       aiChatAvailable);
-  const showLandingHint =
-    !hasActiveTicket && messages.length === 0 && !helpOpen;
+  /** FAQs visible in the main area before the user starts chatting */
+  const showInlineFaqs =
+    !hasActiveTicket && messages.length === 0 && !helpOpen && faqs.length > 0;
+  const showHelpChip =
+    faqs.length > 0 && !showInlineFaqs && !hasActiveTicket;
+  const showWelcomePanel =
+    !hasActiveTicket && messages.length === 0 && !ticketResolved;
   const isDark = themeSettings.isDarkMode;
+  const headerSubSize = widgetHeaderSubFontSize(themeSettings.fontSizeBase);
 
   /** Input uses position:absolute globally; override so the help chip is not covered. */
   const layoutStyles = {
@@ -124,19 +145,22 @@ export default function WidgetMainView({
           </div>
           <div
             style={{
-              fontSize: 12,
+              fontSize: headerSubSize,
               opacity: 0.9,
               marginTop: 2,
+              lineHeight: 1.4,
             }}
           >
             {ticketResolved
               ? "This conversation is resolved"
-              : hasActiveTicket
-                ? "Continue your conversation"
-                : headline}
+              : hasActiveTicket && activeTicketId
+                ? `Ticket ${formatTicketId(activeTicketId)} · Continue your conversation`
+                : hasActiveTicket
+                  ? "Continue your conversation"
+                  : subtitle || headline}
           </div>
         </div>
-        {canEscalate && onContactSupport && !hasActiveTicket ? (
+        {canEscalate && onContactSupport && !hasActiveTicket && !resumableTicketId ? (
           <button
             type="button"
             onClick={onContactSupport}
@@ -148,7 +172,7 @@ export default function WidgetMainView({
               color: "white",
               borderRadius: 999,
               padding: "8px 14px",
-              fontSize: 12,
+              fontSize: headerSubSize,
               fontWeight: 600,
               cursor: interactionLocked ? "not-allowed" : "pointer",
               opacity: interactionLocked ? 0.55 : 1,
@@ -159,6 +183,50 @@ export default function WidgetMainView({
         ) : null}
       </div>
 
+      {resumableTicketId && onResumeTicket && !hasActiveTicket ? (
+        <div
+          style={{
+            flexShrink: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+            padding: "10px 16px",
+            background: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,109,119,0.08)",
+            borderBottom: `1px solid ${isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)"}`,
+          }}
+        >
+          <span
+            style={{
+              fontSize: 13,
+              lineHeight: 1.4,
+              color: isDark ? "#e5e7eb" : "#374151",
+            }}
+          >
+            Open ticket {formatTicketId(resumableTicketId)} — continue with an agent anytime.
+          </span>
+          <button
+            type="button"
+            onClick={onResumeTicket}
+            disabled={interactionLocked}
+            style={{
+              flexShrink: 0,
+              border: "none",
+              borderRadius: 999,
+              padding: "8px 14px",
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: interactionLocked ? "not-allowed" : "pointer",
+              color: "#fff",
+              background: themeSettings.primaryColor ?? "#006D77",
+              opacity: interactionLocked ? 0.55 : 1,
+            }}
+          >
+            Continue
+          </button>
+        </div>
+      ) : null}
+
       <div
         style={{
           flex: 1,
@@ -166,47 +234,22 @@ export default function WidgetMainView({
           display: "flex",
           flexDirection: "column",
           position: "relative",
+          overflowY: "auto",
         }}
       >
-        {showLandingHint ? (
-          <div
-            style={{
-              flex: 1,
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: 24,
-              textAlign: "center",
-              gap: 8,
-              background: isDark ? "#2b2b2b" : "#fafafa",
-            }}
-          >
-            <p
-              style={{
-                margin: 0,
-                fontSize: 14,
-                color: isDark ? "#cbd5e1" : "#475569",
-                lineHeight: 1.5,
-              }}
-            >
-              {subtitle ||
-                (aiChatAvailable
-                  ? "Type below to chat with AI, use Quick help for FAQs."
-                  : "Use Quick help below for FAQs.")}
-            </p>
-            {canEscalate ? (
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: 12,
-                  color: isDark ? "#94a3b8" : "#64748b",
-                }}
-              >
-                Need a person? Tap <strong>Get support</strong> above.
-              </p>
-            ) : null}
-          </div>
+        {showWelcomePanel ? (
+          <WelcomeMessagePanel themeSettings={themeSettings} compact />
+        ) : null}
+
+        {showInlineFaqs ? (
+          <FaqListPanel
+            styles={styles}
+            faqs={faqs}
+            themeSettings={themeSettings}
+            onSelectFAQ={onSelectFAQ}
+            disabled={interactionLocked}
+            compact
+          />
         ) : (
           <>
             <MessageList
@@ -215,6 +258,8 @@ export default function WidgetMainView({
               showTyping={showTyping}
               messagesEndRef={messagesEndRef}
               themeSettings={themeSettings}
+              apiBaseUrl={apiBaseUrl}
+              hideEmptyPlaceholder={showWelcomePanel}
             />
             {showResolvedActions && ratingSubmitted ? (
               <p
@@ -280,7 +325,7 @@ export default function WidgetMainView({
           </>
         )}
 
-        {helpOpen ? (
+        {helpOpen && !showInlineFaqs ? (
           <div
             style={{
               position: "absolute",
@@ -324,12 +369,14 @@ export default function WidgetMainView({
         ) : null}
 
         <div style={{ marginBottom: showComposer && !helpOpen ? 10 : 0 }}>
-          <HelpChip
-            active={helpOpen}
-            disabled={interactionLocked && !helpOpen}
-            onClick={() => onHelpOpenChange(!helpOpen)}
-            themeSettings={themeSettings}
-          />
+          {showHelpChip ? (
+            <HelpChip
+              active={helpOpen}
+              disabled={interactionLocked && !helpOpen}
+              onClick={() => onHelpOpenChange(!helpOpen)}
+              themeSettings={themeSettings}
+            />
+          ) : null}
         </div>
 
         {showComposer && !helpOpen ? (
