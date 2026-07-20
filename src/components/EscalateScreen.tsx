@@ -24,6 +24,7 @@ export default function EscalateScreen({
   collectIdentity,
   initialEmail,
   initialName,
+  initialSummary,
 }: {
   styles: Record<string, React.CSSProperties>;
   themeSettings: ThemeSettings;
@@ -34,8 +35,9 @@ export default function EscalateScreen({
   collectIdentity: boolean;
   initialEmail?: string;
   initialName?: string;
+  initialSummary?: string;
 }) {
-  const [summary, setSummary] = useState("");
+  const [summary, setSummary] = useState(initialSummary ?? "");
   const [email, setEmail] = useState(initialEmail ?? "");
   const [name, setName] = useState(initialName ?? "");
   const [localError, setLocalError] = useState<string | null>(null);

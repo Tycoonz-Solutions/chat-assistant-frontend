@@ -20,6 +20,16 @@ export function ticketMessageToWidgetMsg(m: VisitorTicketMessage): Msg {
   if (m.senderRole === "visitor") {
     return { id: m.id, role: "user", text: m.text, time, sortAt };
   }
+  if (m.senderRole === "bot") {
+    return {
+      id: m.id,
+      role: "bot",
+      text: m.text,
+      senderName: m.senderLabel || "AI Assistant",
+      time,
+      sortAt,
+    };
+  }
   const label =
     m.senderLabel && m.senderLabel !== "Unknown sender" && m.senderLabel !== "System"
       ? m.senderLabel

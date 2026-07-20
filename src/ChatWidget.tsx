@@ -9,6 +9,10 @@ import WidgetMainView from "./components/WidgetMainView";
 import PreChatScreen from "./components/PreChatScreen";
 import EscalateScreen from "./components/EscalateScreen";
 import type { EscalatePayload } from "./components/EscalateScreen";
+import {
+  buildEscalateTranscript,
+  lastUserMessageForEscalate,
+} from "./lib/build-escalate-transcript";
 import type { FAQ, Msg, ChatFAQWidgetProps, ThemeSettings } from "../types/index";
 import {
   fetchWidgetConfig,
@@ -1006,11 +1010,13 @@ export default function ChatWidget({
 
     setEscalateBusy(true);
     try {
+      const transcript = buildEscalateTranscript(messages);
       const r = await postVisitorEscalate(apiBase, {
         email,
         name: payload.name ?? visitor?.name,
         projectToken: tok,
         message: payload.summary,
+        ...(transcript.length ? { transcript } : {}),
       });
       setVisitor((v) => ({
         email: r.email ?? email,
@@ -1285,6 +1291,7 @@ export default function ChatWidget({
             collectIdentity={collectIdentityOnEscalate}
             initialEmail={visitor?.email}
             initialName={visitor?.name}
+            initialSummary={lastUserMessageForEscalate(messages)}
           />
         )}
       </div>

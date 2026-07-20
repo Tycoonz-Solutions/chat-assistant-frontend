@@ -72,7 +72,7 @@ function parseMessageAttrs(attrs: Record<string, unknown>): VisitorTicketMessage
   const role = attrs.senderRole;
   return {
     id: "",
-    senderRole: role === "visitor" || role === "staff" ? role : "unknown",
+    senderRole: role === "visitor" || role === "staff" || role === "bot" ? role : "unknown",
     senderLabel:
       typeof attrs.senderLabel === "string" ? attrs.senderLabel : "Support",
     text: typeof attrs.text === "string" ? attrs.text : "",
@@ -102,7 +102,7 @@ export function parseSocketTicketMessage(
   const role = payload.senderRole;
   return {
     id,
-    senderRole: role === "visitor" || role === "staff" ? role : "unknown",
+    senderRole: role === "visitor" || role === "staff" || role === "bot" ? role : "unknown",
     senderLabel:
       typeof payload.senderLabel === "string" ? payload.senderLabel : "Support",
     text: typeof payload.text === "string" ? payload.text : "",

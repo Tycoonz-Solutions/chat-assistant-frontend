@@ -65,7 +65,7 @@ export async function postVisitorIdentify(
 
 export type VisitorTicketMessage = {
   id: string;
-  senderRole: "visitor" | "staff" | "unknown";
+  senderRole: "visitor" | "staff" | "bot" | "unknown";
   senderLabel: string;
   text: string;
   createdAt: string | null;
@@ -81,7 +81,7 @@ function parseTicketMessages(json: Record<string, unknown>): VisitorTicketMessag
     return {
       id: String(r.id ?? ""),
       senderRole:
-        role === "visitor" || role === "staff" ? role : "unknown",
+        role === "visitor" || role === "staff" || role === "bot" ? role : "unknown",
       senderLabel:
         typeof attrs.senderLabel === "string" ? attrs.senderLabel : "Support",
       text: typeof attrs.text === "string" ? attrs.text : "",
@@ -226,9 +226,21 @@ export async function postVisitorTicketMessage(
   return list[0];
 }
 
+export type EscalateTranscriptTurn = {
+  role: "user" | "assistant";
+  content: string;
+  at?: string;
+};
+
 export async function postVisitorEscalate(
   apiBaseUrl: string,
-  body: { email: string; name?: string; projectToken: string; message: string }
+  body: {
+    email: string;
+    name?: string;
+    projectToken: string;
+    message: string;
+    transcript?: EscalateTranscriptTurn[];
+  }
 ): Promise<VisitorApiResult> {
   assertCompleteJwt(body.projectToken, "projectToken");
   const base = apiBaseUrl.replace(/\/$/, "");
@@ -240,6 +252,7 @@ export async function postVisitorEscalate(
       message: body.message.trim(),
       token: body.projectToken,
       ...(body.name?.trim() ? { name: body.name.trim() } : {}),
+      ...(body.transcript?.length ? { transcript: body.transcript } : {}),
     }),
   });
   const json = (await res.json()) as Record<string, unknown>;

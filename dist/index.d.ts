@@ -76,11 +76,17 @@ declare function postVisitorIdentify(apiBaseUrl: string, body: {
     name?: string;
     projectToken?: string;
 }): Promise<VisitorApiResult>;
+type EscalateTranscriptTurn = {
+    role: "user" | "assistant";
+    content: string;
+    at?: string;
+};
 declare function postVisitorEscalate(apiBaseUrl: string, body: {
     email: string;
     name?: string;
     projectToken: string;
     message: string;
+    transcript?: EscalateTranscriptTurn[];
 }): Promise<VisitorApiResult>;
 
 export { ChatWidget, type VisitorApiResult, assertCompleteJwt, createBackendSendMessage, ChatWidget as default, postChatCompletion, postVisitorEscalate, postVisitorIdentify };

@@ -1535,9 +1535,10 @@ function EscalateScreen({
   busy,
   collectIdentity,
   initialEmail,
-  initialName
+  initialName,
+  initialSummary
 }) {
-  const [summary, setSummary] = (0, import_react4.useState)("");
+  const [summary, setSummary] = (0, import_react4.useState)(initialSummary ?? "");
   const [email, setEmail] = (0, import_react4.useState)(initialEmail ?? "");
   const [name, setName] = (0, import_react4.useState)(initialName ?? "");
   const [localError, setLocalError] = (0, import_react4.useState)(null);
@@ -1704,6 +1705,26 @@ function EscalateScreen({
       }
     )
   ] });
+}
+
+// src/lib/build-escalate-transcript.ts
+function buildEscalateTranscript(messages) {
+  return messages.filter(
+    (m) => !m.faqLocal && !m.isStaff && (m.role === "user" || m.role === "bot") && m.text.trim().length > 0
+  ).map((m) => ({
+    role: m.role === "user" ? "user" : "assistant",
+    content: m.text.trim(),
+    ...m.sortAt ? { at: m.sortAt } : {}
+  }));
+}
+function lastUserMessageForEscalate(messages) {
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const m = messages[i];
+    if (m.role === "user" && !m.faqLocal && m.text.trim()) {
+      return m.text.trim();
+    }
+  }
+  return "";
 }
 
 // src/lib/chat-backend.ts
@@ -1895,7 +1916,7 @@ function parseTicketMessages(json) {
     const role = attrs.senderRole;
     return {
       id: String(r.id ?? ""),
-      senderRole: role === "visitor" || role === "staff" ? role : "unknown",
+      senderRole: role === "visitor" || role === "staff" || role === "bot" ? role : "unknown",
       senderLabel: typeof attrs.senderLabel === "string" ? attrs.senderLabel : "Support",
       text: typeof attrs.text === "string" ? attrs.text : "",
       createdAt: typeof attrs.createdAt === "string" ? attrs.createdAt : null
@@ -2003,7 +2024,8 @@ async function postVisitorEscalate(apiBaseUrl, body) {
       email: body.email.trim(),
       message: body.message.trim(),
       token: body.projectToken,
-      ...body.name?.trim() ? { name: body.name.trim() } : {}
+      ...body.name?.trim() ? { name: body.name.trim() } : {},
+      ...body.transcript?.length ? { transcript: body.transcript } : {}
     })
   });
   const json = await res.json();
@@ -2029,6 +2051,16 @@ function ticketMessageToWidgetMsg(m) {
   const time = formatTime(m.createdAt);
   if (m.senderRole === "visitor") {
     return { id: m.id, role: "user", text: m.text, time, sortAt };
+  }
+  if (m.senderRole === "bot") {
+    return {
+      id: m.id,
+      role: "bot",
+      text: m.text,
+      senderName: m.senderLabel || "AI Assistant",
+      time,
+      sortAt
+    };
   }
   const label = m.senderLabel && m.senderLabel !== "Unknown sender" && m.senderLabel !== "System" ? m.senderLabel : "Support";
   return {
@@ -3093,11 +3125,13 @@ function ChatWidget({
     if (!email) return;
     setEscalateBusy(true);
     try {
+      const transcript = buildEscalateTranscript(messages);
       const r = await postVisitorEscalate(apiBase, {
         email,
         name: payload.name ?? visitor?.name,
         projectToken: tok,
-        message: payload.summary
+        message: payload.summary,
+        ...transcript.length ? { transcript } : {}
       });
       setVisitor((v) => ({
         email: r.email ?? email,
@@ -3370,7 +3404,8 @@ function ChatWidget({
               busy: escalateBusy,
               collectIdentity: collectIdentityOnEscalate,
               initialEmail: visitor?.email,
-              initialName: visitor?.name
+              initialName: visitor?.name,
+              initialSummary: lastUserMessageForEscalate(messages)
             }
           )
         ]
