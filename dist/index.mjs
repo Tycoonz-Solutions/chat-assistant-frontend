@@ -1320,18 +1320,30 @@ function WidgetMainView({
 
 // src/components/PreChatScreen.tsx
 import { useState as useState2 } from "react";
+
+// src/lib/email.ts
+function isValidEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
+var INVALID_EMAIL_MESSAGE = "Please enter a valid email address";
+var REQUIRED_EMAIL_MESSAGE = "Email is required";
+
+// src/components/PreChatScreen.tsx
 import { jsx as jsx11, jsxs as jsxs10 } from "react/jsx-runtime";
 function PreChatScreen({
   styles,
   themeSettings,
   onContinue,
-  busy
+  busy,
+  error
 }) {
   const [name, setName] = useState2("");
   const [email, setEmail] = useState2("");
+  const [localError, setLocalError] = useState2(null);
   const { headline, subtitle } = splitGreetingMessage(themeSettings.greetingMessage);
   const headerFontSize = themeSettings?.fontSizeBase ?? 28;
   const bodyFontSize = headerFontSize / 2;
+  const shownError = localError || error || null;
   return /* @__PURE__ */ jsxs10("div", { style: styles.welcomeScreen, children: [
     /* @__PURE__ */ jsx11("div", { style: styles.welcomeHeader, className: "chat-widget-welcome-header", children: /* @__PURE__ */ jsxs10("div", { style: { position: "relative", zIndex: 1 }, children: [
       /* @__PURE__ */ jsx11(
@@ -1388,8 +1400,17 @@ function PreChatScreen({
           {
             onSubmit: async (e) => {
               e.preventDefault();
-              if (!email.trim()) return;
-              await onContinue({ email: email.trim(), name: name.trim() });
+              const trimmed = email.trim();
+              if (!trimmed) {
+                setLocalError(REQUIRED_EMAIL_MESSAGE);
+                return;
+              }
+              if (!isValidEmail(trimmed)) {
+                setLocalError(INVALID_EMAIL_MESSAGE);
+                return;
+              }
+              setLocalError(null);
+              await onContinue({ email: trimmed, name: name.trim() });
             },
             children: [
               /* @__PURE__ */ jsxs10("div", { style: { marginBottom: 12 }, children: [
@@ -1417,11 +1438,27 @@ function PreChatScreen({
                     type: "email",
                     required: true,
                     value: email,
-                    onChange: (e) => setEmail(e.target.value),
+                    onChange: (e) => {
+                      setEmail(e.target.value);
+                      if (localError) setLocalError(null);
+                    },
                     autoComplete: "email"
                   }
                 )
               ] }),
+              shownError ? /* @__PURE__ */ jsx11(
+                "p",
+                {
+                  role: "alert",
+                  style: {
+                    margin: "0 0 12px",
+                    color: "#f87171",
+                    fontSize: 13,
+                    textAlign: "center"
+                  },
+                  children: shownError
+                }
+              ) : null,
               /* @__PURE__ */ jsx11("div", { style: { display: "flex", justifyContent: "flex-end" }, children: /* @__PURE__ */ jsx11(
                 "button",
                 {
@@ -1461,6 +1498,7 @@ function EscalateScreen({
   const [summary, setSummary] = useState3("");
   const [email, setEmail] = useState3(initialEmail ?? "");
   const [name, setName] = useState3(initialName ?? "");
+  const [localError, setLocalError] = useState3(null);
   const formFontSize = widgetFormFontSize(themeSettings.fontSizeBase);
   const headerSubSize = widgetHeaderSubFontSize(themeSettings.fontSizeBase);
   return /* @__PURE__ */ jsxs11("div", { style: styles.chatScreen, children: [
@@ -1537,7 +1575,10 @@ function EscalateScreen({
                   type: "email",
                   required: true,
                   value: email,
-                  onChange: (e) => setEmail(e.target.value),
+                  onChange: (e) => {
+                    setEmail(e.target.value);
+                    if (localError) setLocalError(null);
+                  },
                   className: "chat-widget-form-input",
                   style: styles.formInput,
                   placeholder: "you@example.com"
@@ -1574,12 +1615,37 @@ function EscalateScreen({
               placeholder: "What do you need help with?"
             }
           ),
+          localError ? /* @__PURE__ */ jsx12(
+            "p",
+            {
+              role: "alert",
+              style: {
+                margin: "10px 0 0",
+                color: "#f87171",
+                fontSize: 13,
+                textAlign: "center"
+              },
+              children: localError
+            }
+          ) : null,
           /* @__PURE__ */ jsx12("div", { style: { marginTop: 16, display: "flex", justifyContent: "flex-end" }, children: /* @__PURE__ */ jsx12(
             "button",
             {
               type: "button",
               disabled: busy || summary.trim().length < 3 || collectIdentity && !email.trim(),
               onClick: async () => {
+                if (collectIdentity) {
+                  const trimmed = email.trim();
+                  if (!trimmed) {
+                    setLocalError(REQUIRED_EMAIL_MESSAGE);
+                    return;
+                  }
+                  if (!isValidEmail(trimmed)) {
+                    setLocalError(INVALID_EMAIL_MESSAGE);
+                    return;
+                  }
+                }
+                setLocalError(null);
                 await onSubmit({
                   summary: summary.trim(),
                   ...collectIdentity ? { email: email.trim(), name: name.trim() || void 0 } : {}
@@ -1745,6 +1811,22 @@ function readEnvelope(json) {
     name: typeof attrs.name === "string" ? attrs.name : void 0
   };
 }
+function apiErrorMessage(json, fallback) {
+  const errors = json.errors;
+  if (errors && typeof errors === "object" && !Array.isArray(errors)) {
+    const map = errors;
+    if (typeof map.email === "string" && map.email.trim()) return map.email.trim();
+    const first = Object.values(map).find(
+      (v) => typeof v === "string" && v.trim() && v.trim().toLowerCase() !== "validation error"
+    );
+    if (typeof first === "string") return first.trim();
+  }
+  if (typeof json.message === "string" && json.message.trim()) {
+    const msg = json.message.trim();
+    if (msg.toLowerCase() !== "validation error") return msg;
+  }
+  return fallback;
+}
 async function postVisitorIdentify(apiBaseUrl, body) {
   const base = apiBaseUrl.replace(/\/$/, "");
   const res = await fetch(`${base}/api/v1/chat-bot/auth/identify`, {
@@ -1758,9 +1840,7 @@ async function postVisitorIdentify(apiBaseUrl, body) {
   });
   const json = await res.json();
   if (!res.ok || json.success === false) {
-    throw new Error(
-      typeof json.message === "string" && json.message ? json.message : `Identify failed (${res.status})`
-    );
+    throw new Error(apiErrorMessage(json, `Identify failed (${res.status})`));
   }
   return readEnvelope(json);
 }
@@ -1886,9 +1966,7 @@ async function postVisitorEscalate(apiBaseUrl, body) {
   });
   const json = await res.json();
   if (!res.ok || json.success === false) {
-    throw new Error(
-      typeof json.message === "string" && json.message ? json.message : `Escalate failed (${res.status})`
-    );
+    throw new Error(apiErrorMessage(json, `Escalate failed (${res.status})`));
   }
   return readEnvelope(json);
 }
@@ -3148,30 +3226,16 @@ function ChatWidget({
         "data-theme": themeSettings.isDarkMode ? "dark" : "light",
         className: `chat-panel chat-pos-${positionClass}`,
         children: [
-          view === "prechat" && /* @__PURE__ */ jsxs12("div", { style: { display: "flex", flexDirection: "column", flex: 1, width: "100%" }, children: [
-            /* @__PURE__ */ jsx13(
-              PreChatScreen,
-              {
-                styles,
-                themeSettings,
-                onContinue: onPreChatContinue,
-                busy: prechatBusy
-              }
-            ),
-            prechatError ? /* @__PURE__ */ jsx13(
-              "p",
-              {
-                style: {
-                  color: "#b91c1c",
-                  fontSize: 13,
-                  padding: "0 24px 12px",
-                  margin: 0,
-                  textAlign: "center"
-                },
-                children: prechatError
-              }
-            ) : null
-          ] }),
+          view === "prechat" && /* @__PURE__ */ jsx13("div", { style: { display: "flex", flexDirection: "column", flex: 1, width: "100%" }, children: /* @__PURE__ */ jsx13(
+            PreChatScreen,
+            {
+              styles,
+              themeSettings,
+              onContinue: onPreChatContinue,
+              busy: prechatBusy,
+              error: prechatError
+            }
+          ) }),
           view === "main" && visitorGateEffective ? /* @__PURE__ */ jsx13(
             WidgetMainView,
             {

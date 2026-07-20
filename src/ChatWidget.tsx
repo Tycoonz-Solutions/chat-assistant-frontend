@@ -1188,20 +1188,8 @@ export default function ChatWidget({
               themeSettings={themeSettings}
               onContinue={onPreChatContinue}
               busy={prechatBusy}
+              error={prechatError}
             />
-            {prechatError ? (
-              <p
-                style={{
-                  color: "#b91c1c",
-                  fontSize: 13,
-                  padding: "0 24px 12px",
-                  margin: 0,
-                  textAlign: "center",
-                }}
-              >
-                {prechatError}
-              </p>
-            ) : null}
           </div>
         )}
 

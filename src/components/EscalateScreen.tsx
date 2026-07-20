@@ -2,6 +2,11 @@ import React, { useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import type { ThemeSettings } from "../../types/index";
 import { widgetFormFontSize, widgetHeaderSubFontSize } from "../lib/widget-font-size";
+import {
+  INVALID_EMAIL_MESSAGE,
+  REQUIRED_EMAIL_MESSAGE,
+  isValidEmail,
+} from "../lib/email";
 
 export type EscalatePayload = {
   summary: string;
@@ -33,6 +38,7 @@ export default function EscalateScreen({
   const [summary, setSummary] = useState("");
   const [email, setEmail] = useState(initialEmail ?? "");
   const [name, setName] = useState(initialName ?? "");
+  const [localError, setLocalError] = useState<string | null>(null);
   const formFontSize = widgetFormFontSize(themeSettings.fontSizeBase);
   const headerSubSize = widgetHeaderSubFontSize(themeSettings.fontSizeBase);
 
@@ -105,7 +111,10 @@ export default function EscalateScreen({
                 type="email"
                 required
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (localError) setLocalError(null);
+                }}
                 className="chat-widget-form-input"
                 style={styles.formInput as React.CSSProperties}
                 placeholder="you@example.com"
@@ -136,6 +145,19 @@ export default function EscalateScreen({
           }}
           placeholder="What do you need help with?"
         />
+        {localError ? (
+          <p
+            role="alert"
+            style={{
+              margin: "10px 0 0",
+              color: "#f87171",
+              fontSize: 13,
+              textAlign: "center",
+            }}
+          >
+            {localError}
+          </p>
+        ) : null}
         <div style={{ marginTop: 16, display: "flex", justifyContent: "flex-end" }}>
           <button
             type="button"
@@ -145,6 +167,18 @@ export default function EscalateScreen({
               (collectIdentity && !email.trim())
             }
             onClick={async () => {
+              if (collectIdentity) {
+                const trimmed = email.trim();
+                if (!trimmed) {
+                  setLocalError(REQUIRED_EMAIL_MESSAGE);
+                  return;
+                }
+                if (!isValidEmail(trimmed)) {
+                  setLocalError(INVALID_EMAIL_MESSAGE);
+                  return;
+                }
+              }
+              setLocalError(null);
               await onSubmit({
                 summary: summary.trim(),
                 ...(collectIdentity

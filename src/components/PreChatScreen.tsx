@@ -1,23 +1,32 @@
 import React, { useState } from "react";
 import type { ThemeSettings } from "../../types/index";
 import { splitGreetingMessage } from "../lib/greeting-message";
+import {
+  INVALID_EMAIL_MESSAGE,
+  REQUIRED_EMAIL_MESSAGE,
+  isValidEmail,
+} from "../lib/email";
 
 export default function PreChatScreen({
   styles,
   themeSettings,
   onContinue,
   busy,
+  error,
 }: {
   styles: Record<string, React.CSSProperties>;
   themeSettings: ThemeSettings;
   onContinue: (payload: { email: string; name: string }) => void | Promise<void>;
   busy: boolean;
+  error?: string | null;
 }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [localError, setLocalError] = useState<string | null>(null);
   const { headline, subtitle } = splitGreetingMessage(themeSettings.greetingMessage);
   const headerFontSize = themeSettings?.fontSizeBase ?? 28;
   const bodyFontSize = headerFontSize / 2;
+  const shownError = localError || error || null;
 
   return (
     <div style={styles.welcomeScreen}>
@@ -75,8 +84,17 @@ export default function PreChatScreen({
           <form
             onSubmit={async (e) => {
               e.preventDefault();
-              if (!email.trim()) return;
-              await onContinue({ email: email.trim(), name: name.trim() });
+              const trimmed = email.trim();
+              if (!trimmed) {
+                setLocalError(REQUIRED_EMAIL_MESSAGE);
+                return;
+              }
+              if (!isValidEmail(trimmed)) {
+                setLocalError(INVALID_EMAIL_MESSAGE);
+                return;
+              }
+              setLocalError(null);
+              await onContinue({ email: trimmed, name: name.trim() });
             }}
           >
             <div style={{ marginBottom: 12 }}>
@@ -99,10 +117,26 @@ export default function PreChatScreen({
                 type="email"
                 required
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (localError) setLocalError(null);
+                }}
                 autoComplete="email"
               />
             </div>
+            {shownError ? (
+              <p
+                role="alert"
+                style={{
+                  margin: "0 0 12px",
+                  color: "#f87171",
+                  fontSize: 13,
+                  textAlign: "center",
+                }}
+              >
+                {shownError}
+              </p>
+            ) : null}
             <div style={{ display: "flex", justifyContent: "flex-end" }}>
               <button
                 type="submit"

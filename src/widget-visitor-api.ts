@@ -24,6 +24,24 @@ function readEnvelope(json: Record<string, unknown>): VisitorApiResult {
   };
 }
 
+/** Prefer field errors (especially email) over a generic API message. */
+function apiErrorMessage(json: Record<string, unknown>, fallback: string): string {
+  const errors = json.errors;
+  if (errors && typeof errors === "object" && !Array.isArray(errors)) {
+    const map = errors as Record<string, unknown>;
+    if (typeof map.email === "string" && map.email.trim()) return map.email.trim();
+    const first = Object.values(map).find(
+      (v) => typeof v === "string" && v.trim() && v.trim().toLowerCase() !== "validation error"
+    );
+    if (typeof first === "string") return first.trim();
+  }
+  if (typeof json.message === "string" && json.message.trim()) {
+    const msg = json.message.trim();
+    if (msg.toLowerCase() !== "validation error") return msg;
+  }
+  return fallback;
+}
+
 export async function postVisitorIdentify(
   apiBaseUrl: string,
   body: { email: string; name?: string; projectToken?: string }
@@ -40,11 +58,7 @@ export async function postVisitorIdentify(
   });
   const json = (await res.json()) as Record<string, unknown>;
   if (!res.ok || json.success === false) {
-    throw new Error(
-      typeof json.message === "string" && json.message
-        ? json.message
-        : `Identify failed (${res.status})`
-    );
+    throw new Error(apiErrorMessage(json, `Identify failed (${res.status})`));
   }
   return readEnvelope(json);
 }
@@ -230,11 +244,7 @@ export async function postVisitorEscalate(
   });
   const json = (await res.json()) as Record<string, unknown>;
   if (!res.ok || json.success === false) {
-    throw new Error(
-      typeof json.message === "string" && json.message
-        ? json.message
-        : `Escalate failed (${res.status})`
-    );
+    throw new Error(apiErrorMessage(json, `Escalate failed (${res.status})`));
   }
   return readEnvelope(json);
 }
