@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import MessageList from "./MessageList";
 import InputArea from "./InputArea";
 import FaqListPanel from "./FaqListPanel";
@@ -11,6 +11,7 @@ import {
   widgetBodyFontSize,
   widgetHeaderSubFontSize,
 } from "../lib/widget-font-size";
+import { splitTicketThreadHistory } from "../lib/ticket-thread-ui";
 
 const DEFAULT_GREETING = "Hi there!\nHow can we help you today?";
 
@@ -111,6 +112,27 @@ export default function WidgetMainView({
     !hasActiveTicket && messages.length === 0 && !ticketResolved;
   const isDark = themeSettings.isDarkMode;
   const headerSubSize = widgetHeaderSubFontSize(themeSettings.fontSizeBase);
+  const bodyFontSize = widgetBodyFontSize(themeSettings.fontSizeBase);
+
+  const [showPreviousConversation, setShowPreviousConversation] = useState(false);
+
+  useEffect(() => {
+    setShowPreviousConversation(false);
+  }, [activeTicketId]);
+
+  const { previous: previousMessages, current: currentMessages } = useMemo(
+    () =>
+      hasActiveTicket
+        ? splitTicketThreadHistory(messages)
+        : { previous: [] as Msg[], current: messages },
+    [hasActiveTicket, messages],
+  );
+
+  const hasPreviousConversation = previousMessages.length > 0;
+  const displayMessages =
+    hasActiveTicket && hasPreviousConversation && !showPreviousConversation
+      ? currentMessages
+      : messages;
 
   /** Input uses position:absolute globally; override so the help chip is not covered. */
   const layoutStyles = {
@@ -252,9 +274,40 @@ export default function WidgetMainView({
           />
         ) : (
           <>
+            {hasActiveTicket && hasPreviousConversation ? (
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "center",
+                  padding: "10px 16px 0",
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => setShowPreviousConversation((v) => !v)}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    padding: 0,
+                    margin: 0,
+                    cursor: "pointer",
+                    fontSize: bodyFontSize,
+                    fontWeight: 500,
+                    lineHeight: 1.4,
+                    color: themeSettings.primaryColor ?? "#006D77",
+                    textDecoration: "underline",
+                    textUnderlineOffset: 3,
+                  }}
+                >
+                  {showPreviousConversation
+                    ? "Hide previous conversation"
+                    : "Show previous conversation"}
+                </button>
+              </div>
+            ) : null}
             <MessageList
               styles={layoutStyles as never}
-              messages={messages as never[]}
+              messages={displayMessages as never[]}
               showTyping={showTyping}
               messagesEndRef={messagesEndRef}
               themeSettings={themeSettings}

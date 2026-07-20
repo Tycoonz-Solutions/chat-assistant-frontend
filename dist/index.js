@@ -41,7 +41,7 @@ __export(index_exports, {
 module.exports = __toCommonJS(index_exports);
 
 // src/ChatWidget.tsx
-var import_react5 = require("react");
+var import_react6 = require("react");
 
 // src/components/FloatingButton.tsx
 var import_lucide_react = require("lucide-react");
@@ -670,6 +670,9 @@ function ChatScreen({
   ] });
 }
 
+// src/components/WidgetMainView.tsx
+var import_react3 = require("react");
+
 // src/components/FaqListPanel.tsx
 var import_lucide_react5 = require("lucide-react");
 var import_jsx_runtime6 = require("react/jsx-runtime");
@@ -1018,6 +1021,94 @@ function WelcomeMessagePanel({
   );
 }
 
+// src/lib/ticket-thread-ui.ts
+function formatTime(iso) {
+  if (!iso) {
+    return (/* @__PURE__ */ new Date()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  }
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) {
+    return (/* @__PURE__ */ new Date()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  }
+  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+function ticketMessageToWidgetMsg(m) {
+  const sortAt = m.createdAt ?? (/* @__PURE__ */ new Date()).toISOString();
+  const time = formatTime(m.createdAt);
+  if (m.senderRole === "visitor") {
+    return { id: m.id, role: "user", text: m.text, time, sortAt };
+  }
+  if (m.senderRole === "bot") {
+    return {
+      id: m.id,
+      role: "bot",
+      text: m.text,
+      senderName: m.senderLabel || "AI Assistant",
+      time,
+      sortAt
+    };
+  }
+  const label = m.senderLabel && m.senderLabel !== "Unknown sender" && m.senderLabel !== "System" ? m.senderLabel : "Support";
+  return {
+    id: m.id,
+    role: "bot",
+    text: m.text,
+    senderName: parseStaffSenderName(label),
+    isStaff: true,
+    time,
+    sortAt
+  };
+}
+function faqExchangeToMsgs(exchange) {
+  const base = Date.parse(exchange.askedAt) || Date.now();
+  const qAt = new Date(base).toISOString();
+  const aAt = new Date(base + 1).toISOString();
+  return [
+    {
+      role: "user",
+      text: exchange.question,
+      time: formatTime(qAt),
+      sortAt: qAt,
+      faqLocal: true
+    },
+    {
+      role: "bot",
+      text: exchange.answer,
+      time: formatTime(aAt),
+      sortAt: aAt,
+      faqLocal: true,
+      faqForQuestion: exchange.question
+    }
+  ];
+}
+function compareMsgs(a, b) {
+  const ta = a.sortAt ?? "";
+  const tb = b.sortAt ?? "";
+  if (ta !== tb) return ta.localeCompare(tb);
+  if (a.role !== b.role) return a.role === "user" ? -1 : 1;
+  return 0;
+}
+function buildVisitorThread(ticketMsgs, faqExchanges) {
+  const faqMsgs = faqExchanges.flatMap(faqExchangeToMsgs);
+  return [...ticketMsgs, ...faqMsgs].sort(compareMsgs);
+}
+function isAiBotMessage(m) {
+  return m.role === "bot" && !m.isStaff && !m.faqLocal;
+}
+function splitTicketThreadHistory(messages) {
+  let lastAiIdx = -1;
+  for (let i = 0; i < messages.length; i += 1) {
+    if (isAiBotMessage(messages[i])) lastAiIdx = i;
+  }
+  if (lastAiIdx < 0) {
+    return { previous: [], current: messages };
+  }
+  return {
+    previous: messages.slice(0, lastAiIdx + 1),
+    current: messages.slice(lastAiIdx + 1)
+  };
+}
+
 // src/components/WidgetMainView.tsx
 var import_jsx_runtime10 = require("react/jsx-runtime");
 var DEFAULT_GREETING2 = "Hi there!\nHow can we help you today?";
@@ -1071,6 +1162,17 @@ function WidgetMainView({
   const showWelcomePanel = !hasActiveTicket && messages.length === 0 && !ticketResolved;
   const isDark = themeSettings.isDarkMode;
   const headerSubSize = widgetHeaderSubFontSize(themeSettings.fontSizeBase);
+  const bodyFontSize = widgetBodyFontSize(themeSettings.fontSizeBase);
+  const [showPreviousConversation, setShowPreviousConversation] = (0, import_react3.useState)(false);
+  (0, import_react3.useEffect)(() => {
+    setShowPreviousConversation(false);
+  }, [activeTicketId]);
+  const { previous: previousMessages, current: currentMessages } = (0, import_react3.useMemo)(
+    () => hasActiveTicket ? splitTicketThreadHistory(messages) : { previous: [], current: messages },
+    [hasActiveTicket, messages]
+  );
+  const hasPreviousConversation = previousMessages.length > 0;
+  const displayMessages = hasActiveTicket && hasPreviousConversation && !showPreviousConversation ? currentMessages : messages;
   const layoutStyles = {
     ...styles,
     messagesArea: {
@@ -1211,11 +1313,42 @@ function WidgetMainView({
               compact: true
             }
           ) : /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(import_jsx_runtime10.Fragment, { children: [
+            hasActiveTicket && hasPreviousConversation ? /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+              "div",
+              {
+                style: {
+                  display: "flex",
+                  justifyContent: "center",
+                  padding: "10px 16px 0"
+                },
+                children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+                  "button",
+                  {
+                    type: "button",
+                    onClick: () => setShowPreviousConversation((v) => !v),
+                    style: {
+                      background: "none",
+                      border: "none",
+                      padding: 0,
+                      margin: 0,
+                      cursor: "pointer",
+                      fontSize: bodyFontSize,
+                      fontWeight: 500,
+                      lineHeight: 1.4,
+                      color: themeSettings.primaryColor ?? "#006D77",
+                      textDecoration: "underline",
+                      textUnderlineOffset: 3
+                    },
+                    children: showPreviousConversation ? "Hide previous conversation" : "Show previous conversation"
+                  }
+                )
+              }
+            ) : null,
             /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
               MessageList,
               {
                 styles: layoutStyles,
-                messages,
+                messages: displayMessages,
                 showTyping,
                 messagesEndRef,
                 themeSettings,
@@ -1361,7 +1494,7 @@ function WidgetMainView({
 }
 
 // src/components/PreChatScreen.tsx
-var import_react3 = require("react");
+var import_react4 = require("react");
 
 // src/lib/email.ts
 function isValidEmail(value) {
@@ -1379,9 +1512,9 @@ function PreChatScreen({
   busy,
   error
 }) {
-  const [name, setName] = (0, import_react3.useState)("");
-  const [email, setEmail] = (0, import_react3.useState)("");
-  const [localError, setLocalError] = (0, import_react3.useState)(null);
+  const [name, setName] = (0, import_react4.useState)("");
+  const [email, setEmail] = (0, import_react4.useState)("");
+  const [localError, setLocalError] = (0, import_react4.useState)(null);
   const { headline, subtitle } = splitGreetingMessage(themeSettings.greetingMessage);
   const headerFontSize = themeSettings?.fontSizeBase ?? 28;
   const bodyFontSize = headerFontSize / 2;
@@ -1523,7 +1656,7 @@ function PreChatScreen({
 }
 
 // src/components/EscalateScreen.tsx
-var import_react4 = require("react");
+var import_react5 = require("react");
 var import_lucide_react7 = require("lucide-react");
 var import_jsx_runtime12 = require("react/jsx-runtime");
 function EscalateScreen({
@@ -1538,10 +1671,10 @@ function EscalateScreen({
   initialName,
   initialSummary
 }) {
-  const [summary, setSummary] = (0, import_react4.useState)(initialSummary ?? "");
-  const [email, setEmail] = (0, import_react4.useState)(initialEmail ?? "");
-  const [name, setName] = (0, import_react4.useState)(initialName ?? "");
-  const [localError, setLocalError] = (0, import_react4.useState)(null);
+  const [summary, setSummary] = (0, import_react5.useState)(initialSummary ?? "");
+  const [email, setEmail] = (0, import_react5.useState)(initialEmail ?? "");
+  const [name, setName] = (0, import_react5.useState)(initialName ?? "");
+  const [localError, setLocalError] = (0, import_react5.useState)(null);
   const formFontSize = widgetFormFontSize(themeSettings.fontSizeBase);
   const headerSubSize = widgetHeaderSubFontSize(themeSettings.fontSizeBase);
   return /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { style: styles.chatScreen, children: [
@@ -2035,78 +2168,6 @@ async function postVisitorEscalate(apiBaseUrl, body) {
   return readEnvelope(json);
 }
 
-// src/lib/ticket-thread-ui.ts
-function formatTime(iso) {
-  if (!iso) {
-    return (/* @__PURE__ */ new Date()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  }
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) {
-    return (/* @__PURE__ */ new Date()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  }
-  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-}
-function ticketMessageToWidgetMsg(m) {
-  const sortAt = m.createdAt ?? (/* @__PURE__ */ new Date()).toISOString();
-  const time = formatTime(m.createdAt);
-  if (m.senderRole === "visitor") {
-    return { id: m.id, role: "user", text: m.text, time, sortAt };
-  }
-  if (m.senderRole === "bot") {
-    return {
-      id: m.id,
-      role: "bot",
-      text: m.text,
-      senderName: m.senderLabel || "AI Assistant",
-      time,
-      sortAt
-    };
-  }
-  const label = m.senderLabel && m.senderLabel !== "Unknown sender" && m.senderLabel !== "System" ? m.senderLabel : "Support";
-  return {
-    id: m.id,
-    role: "bot",
-    text: m.text,
-    senderName: parseStaffSenderName(label),
-    isStaff: true,
-    time,
-    sortAt
-  };
-}
-function faqExchangeToMsgs(exchange) {
-  const base = Date.parse(exchange.askedAt) || Date.now();
-  const qAt = new Date(base).toISOString();
-  const aAt = new Date(base + 1).toISOString();
-  return [
-    {
-      role: "user",
-      text: exchange.question,
-      time: formatTime(qAt),
-      sortAt: qAt,
-      faqLocal: true
-    },
-    {
-      role: "bot",
-      text: exchange.answer,
-      time: formatTime(aAt),
-      sortAt: aAt,
-      faqLocal: true,
-      faqForQuestion: exchange.question
-    }
-  ];
-}
-function compareMsgs(a, b) {
-  const ta = a.sortAt ?? "";
-  const tb = b.sortAt ?? "";
-  if (ta !== tb) return ta.localeCompare(tb);
-  if (a.role !== b.role) return a.role === "user" ? -1 : 1;
-  return 0;
-}
-function buildVisitorThread(ticketMsgs, faqExchanges) {
-  const faqMsgs = faqExchanges.flatMap(faqExchangeToMsgs);
-  return [...ticketMsgs, ...faqMsgs].sort(compareMsgs);
-}
-
 // src/lib/widget-storage-id.ts
 function widgetProjectStorageId(projectToken) {
   const token = projectToken?.trim();
@@ -2320,49 +2381,49 @@ function ChatWidget({
   const hasApi = hasWidgetApiBase(apiBaseUrl);
   const gateDefault = Boolean(hasApi && projectToken?.trim());
   const visitorGateEffective = visitorGate !== void 0 ? visitorGate : gateDefault;
-  const [open, setOpen] = (0, import_react5.useState)(false);
-  const [view, setView] = (0, import_react5.useState)(() => {
+  const [open, setOpen] = (0, import_react6.useState)(false);
+  const [view, setView] = (0, import_react6.useState)(() => {
     if (!visitorGateEffective) return "welcome";
     return "prechat";
   });
-  const [helpOpen, setHelpOpen] = (0, import_react5.useState)(false);
-  const [messages, setMessages] = (0, import_react5.useState)([]);
-  const [text, setText] = (0, import_react5.useState)("");
-  const [awaitingBot, setAwaitingBot] = (0, import_react5.useState)(false);
-  const [sending, setSending] = (0, import_react5.useState)(false);
-  const [visitor, setVisitor] = (0, import_react5.useState)(null);
-  const [prechatBusy, setPrechatBusy] = (0, import_react5.useState)(false);
-  const [prechatError, setPrechatError] = (0, import_react5.useState)(null);
-  const [escalateBusy, setEscalateBusy] = (0, import_react5.useState)(false);
-  const [remoteFaqs, setRemoteFaqs] = (0, import_react5.useState)(null);
-  const [capabilities, setCapabilities] = (0, import_react5.useState)({
+  const [helpOpen, setHelpOpen] = (0, import_react6.useState)(false);
+  const [messages, setMessages] = (0, import_react6.useState)([]);
+  const [text, setText] = (0, import_react6.useState)("");
+  const [awaitingBot, setAwaitingBot] = (0, import_react6.useState)(false);
+  const [sending, setSending] = (0, import_react6.useState)(false);
+  const [visitor, setVisitor] = (0, import_react6.useState)(null);
+  const [prechatBusy, setPrechatBusy] = (0, import_react6.useState)(false);
+  const [prechatError, setPrechatError] = (0, import_react6.useState)(null);
+  const [escalateBusy, setEscalateBusy] = (0, import_react6.useState)(false);
+  const [remoteFaqs, setRemoteFaqs] = (0, import_react6.useState)(null);
+  const [capabilities, setCapabilities] = (0, import_react6.useState)({
     aiChatEnabled: true,
     agentSupportEnabled: true
   });
-  const [ticketSummary, setTicketSummary] = (0, import_react5.useState)(null);
-  const [ratingBusy, setRatingBusy] = (0, import_react5.useState)(false);
-  const [ratingSkipped, setRatingSkipped] = (0, import_react5.useState)(false);
-  const [allowResolvedReply, setAllowResolvedReply] = (0, import_react5.useState)(false);
-  const [widgetUnavailable, setWidgetUnavailable] = (0, import_react5.useState)(null);
-  const [sessionReady, setSessionReady] = (0, import_react5.useState)(!visitorGateEffective);
-  const [inTicketThread, setInTicketThread] = (0, import_react5.useState)(false);
-  const interactionLockRef = (0, import_react5.useRef)(false);
-  const [interactionLocked, setInteractionLocked] = (0, import_react5.useState)(false);
-  const acquireInteractionLock = (0, import_react5.useCallback)(() => {
+  const [ticketSummary, setTicketSummary] = (0, import_react6.useState)(null);
+  const [ratingBusy, setRatingBusy] = (0, import_react6.useState)(false);
+  const [ratingSkipped, setRatingSkipped] = (0, import_react6.useState)(false);
+  const [allowResolvedReply, setAllowResolvedReply] = (0, import_react6.useState)(false);
+  const [widgetUnavailable, setWidgetUnavailable] = (0, import_react6.useState)(null);
+  const [sessionReady, setSessionReady] = (0, import_react6.useState)(!visitorGateEffective);
+  const [inTicketThread, setInTicketThread] = (0, import_react6.useState)(false);
+  const interactionLockRef = (0, import_react6.useRef)(false);
+  const [interactionLocked, setInteractionLocked] = (0, import_react6.useState)(false);
+  const acquireInteractionLock = (0, import_react6.useCallback)(() => {
     if (interactionLockRef.current) return false;
     interactionLockRef.current = true;
     setInteractionLocked(true);
     return true;
   }, []);
-  const releaseInteractionLock = (0, import_react5.useCallback)(() => {
+  const releaseInteractionLock = (0, import_react6.useCallback)(() => {
     interactionLockRef.current = false;
     setInteractionLocked(false);
   }, []);
-  const handleHelpOpenChange = (0, import_react5.useCallback)((open2) => {
+  const handleHelpOpenChange = (0, import_react6.useCallback)((open2) => {
     if (open2 && interactionLockRef.current) return;
     setHelpOpen(open2);
   }, []);
-  const [themeSettings, setThemeSettings] = (0, import_react5.useState)({
+  const [themeSettings, setThemeSettings] = (0, import_react6.useState)({
     isDarkMode: false,
     primaryColor: "#006D77",
     secondaryColor: "#006D7738",
@@ -2370,13 +2431,13 @@ function ChatWidget({
     isGradient: false,
     position: "bottom-right"
   });
-  (0, import_react5.useEffect)(() => {
+  (0, import_react6.useEffect)(() => {
     if (!themeSettingsProp) return;
     setThemeSettings((prev) => ({ ...prev, ...themeSettingsProp }));
   }, [themeSettingsProp]);
-  const themeSettingsPropRef = (0, import_react5.useRef)(themeSettingsProp);
+  const themeSettingsPropRef = (0, import_react6.useRef)(themeSettingsProp);
   themeSettingsPropRef.current = themeSettingsProp;
-  (0, import_react5.useEffect)(() => {
+  (0, import_react6.useEffect)(() => {
     const tok = projectToken?.trim();
     if (!hasApi || apiBase === void 0 || !tok) return;
     let cancelled = false;
@@ -2411,13 +2472,13 @@ function ChatWidget({
       cancelled = true;
     };
   }, [apiBase, hasApi, projectToken]);
-  const faqs = (0, import_react5.useMemo)(() => {
+  const faqs = (0, import_react6.useMemo)(() => {
     if (faqsProp && faqsProp.length > 0) return faqsProp;
     return remoteFaqs ?? [];
   }, [faqsProp, remoteFaqs]);
-  const panelRef = (0, import_react5.useRef)(null);
-  const messagesEndRef = (0, import_react5.useRef)(null);
-  const visitorRef = (0, import_react5.useRef)(visitor);
+  const panelRef = (0, import_react6.useRef)(null);
+  const messagesEndRef = (0, import_react6.useRef)(null);
+  const visitorRef = (0, import_react6.useRef)(visitor);
   visitorRef.current = visitor;
   const hasAiBackend = Boolean(sendMessage);
   const aiChatAvailable = capabilities.aiChatEnabled && hasAiBackend;
@@ -2428,14 +2489,14 @@ function ChatWidget({
     hasApi && projectToken?.trim() && capabilities.agentSupportEnabled && !activeTicketId
   );
   const visitorAccessToken = visitor?.accessToken ?? null;
-  const ticketSyncInFlightRef = (0, import_react5.useRef)(false);
-  const ratingSkipStorageKey = (0, import_react5.useCallback)(
+  const ticketSyncInFlightRef = (0, import_react6.useRef)(false);
+  const ratingSkipStorageKey = (0, import_react6.useCallback)(
     (ticketId) => {
       return `chat-widget-rating-skipped-${widgetProjectStorageId(projectToken)}-${ticketId}`;
     },
     [projectToken]
   );
-  const syncTicketThread = (0, import_react5.useCallback)(async () => {
+  const syncTicketThread = (0, import_react6.useCallback)(async () => {
     const tid = visitorRef.current?.ticketId;
     const token = visitorRef.current?.accessToken;
     if (apiBase === void 0 || !tid || !token) return;
@@ -2456,7 +2517,7 @@ function ChatWidget({
       ticketSyncInFlightRef.current = false;
     }
   }, [apiBase, projectToken]);
-  (0, import_react5.useEffect)(() => {
+  (0, import_react6.useEffect)(() => {
     if (!activeTicketId) {
       setTicketSummary(null);
       setRatingSkipped(false);
@@ -2466,12 +2527,12 @@ function ChatWidget({
     const skipped = typeof window !== "undefined" && sessionStorage.getItem(ratingSkipStorageKey(activeTicketId)) === "1";
     setRatingSkipped(skipped);
   }, [activeTicketId, ratingSkipStorageKey]);
-  (0, import_react5.useEffect)(() => {
+  (0, import_react6.useEffect)(() => {
     if (ticketSummary?.status !== "resolved") {
       setAllowResolvedReply(false);
     }
   }, [ticketSummary?.status]);
-  (0, import_react5.useEffect)(() => {
+  (0, import_react6.useEffect)(() => {
     if (!visitorGateEffective) {
       setSessionReady(true);
       return;
@@ -2545,12 +2606,12 @@ function ChatWidget({
       disconnectVisitorSocket();
     };
   }, [visitorGateEffective, projectToken, apiBase]);
-  (0, import_react5.useEffect)(() => {
+  (0, import_react6.useEffect)(() => {
     if (visitor) {
       saveVisitorSession(visitor, projectToken);
     }
   }, [visitor, projectToken]);
-  (0, import_react5.useEffect)(() => {
+  (0, import_react6.useEffect)(() => {
     if (!sessionReady || !open || view !== "main" || !viewingTicketThread || !visitorAccessToken) return;
     void syncTicketThread();
     const id = window.setInterval(() => {
@@ -2558,7 +2619,7 @@ function ChatWidget({
     }, 12e3);
     return () => window.clearInterval(id);
   }, [sessionReady, open, view, viewingTicketThread, visitorAccessToken, syncTicketThread]);
-  (0, import_react5.useEffect)(() => {
+  (0, import_react6.useEffect)(() => {
     const token = visitorAccessToken;
     if (apiBase === void 0 || !apiBase || !token) return;
     ensureVisitorSocket(apiBase, token);
@@ -2592,11 +2653,11 @@ function ChatWidget({
       unsubTicket();
     };
   }, [apiBase, visitorAccessToken, projectToken, syncTicketThread]);
-  const collectIdentityOnEscalate = (0, import_react5.useMemo)(
+  const collectIdentityOnEscalate = (0, import_react6.useMemo)(
     () => !visitor || !visitor.email,
     [visitor]
   );
-  (0, import_react5.useEffect)(() => {
+  (0, import_react6.useEffect)(() => {
     function onDocClick(e) {
       if (!open) return;
       if (!panelRef.current) return;
@@ -2615,7 +2676,7 @@ function ChatWidget({
     document.addEventListener("mousedown", onDocClick);
     return () => document.removeEventListener("mousedown", onDocClick);
   }, [open, visitorGateEffective]);
-  (0, import_react5.useEffect)(() => {
+  (0, import_react6.useEffect)(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
   const nowTime = () => (/* @__PURE__ */ new Date()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });

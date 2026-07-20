@@ -84,3 +84,29 @@ export function buildVisitorThread(
   const faqMsgs = faqExchanges.flatMap(faqExchangeToMsgs);
   return [...ticketMsgs, ...faqMsgs].sort(compareMsgs);
 }
+
+function isAiBotMessage(m: Msg): boolean {
+  return m.role === "bot" && !m.isStaff && !m.faqLocal;
+}
+
+/**
+ * Split a ticket thread so the widget can hide pre-ticket AI chat behind
+ * "Show previous conversation", while always showing the ticket query + later replies.
+ */
+export function splitTicketThreadHistory(messages: Msg[]): {
+  previous: Msg[];
+  current: Msg[];
+} {
+  let lastAiIdx = -1;
+  for (let i = 0; i < messages.length; i += 1) {
+    if (isAiBotMessage(messages[i])) lastAiIdx = i;
+  }
+  if (lastAiIdx < 0) {
+    return { previous: [], current: messages };
+  }
+  return {
+    previous: messages.slice(0, lastAiIdx + 1),
+    current: messages.slice(lastAiIdx + 1),
+  };
+}
+

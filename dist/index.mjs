@@ -1,5 +1,5 @@
 // src/ChatWidget.tsx
-import { useCallback, useEffect, useMemo, useRef, useState as useState4 } from "react";
+import { useCallback, useEffect as useEffect2, useMemo as useMemo2, useRef, useState as useState5 } from "react";
 
 // src/components/FloatingButton.tsx
 import { MessageCircle, X } from "lucide-react";
@@ -628,6 +628,9 @@ function ChatScreen({
   ] });
 }
 
+// src/components/WidgetMainView.tsx
+import { useEffect, useMemo, useState as useState2 } from "react";
+
 // src/components/FaqListPanel.tsx
 import { ChevronRight as ChevronRight2, List as List2 } from "lucide-react";
 import { jsx as jsx6, jsxs as jsxs5 } from "react/jsx-runtime";
@@ -976,6 +979,94 @@ function WelcomeMessagePanel({
   );
 }
 
+// src/lib/ticket-thread-ui.ts
+function formatTime(iso) {
+  if (!iso) {
+    return (/* @__PURE__ */ new Date()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  }
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) {
+    return (/* @__PURE__ */ new Date()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  }
+  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+function ticketMessageToWidgetMsg(m) {
+  const sortAt = m.createdAt ?? (/* @__PURE__ */ new Date()).toISOString();
+  const time = formatTime(m.createdAt);
+  if (m.senderRole === "visitor") {
+    return { id: m.id, role: "user", text: m.text, time, sortAt };
+  }
+  if (m.senderRole === "bot") {
+    return {
+      id: m.id,
+      role: "bot",
+      text: m.text,
+      senderName: m.senderLabel || "AI Assistant",
+      time,
+      sortAt
+    };
+  }
+  const label = m.senderLabel && m.senderLabel !== "Unknown sender" && m.senderLabel !== "System" ? m.senderLabel : "Support";
+  return {
+    id: m.id,
+    role: "bot",
+    text: m.text,
+    senderName: parseStaffSenderName(label),
+    isStaff: true,
+    time,
+    sortAt
+  };
+}
+function faqExchangeToMsgs(exchange) {
+  const base = Date.parse(exchange.askedAt) || Date.now();
+  const qAt = new Date(base).toISOString();
+  const aAt = new Date(base + 1).toISOString();
+  return [
+    {
+      role: "user",
+      text: exchange.question,
+      time: formatTime(qAt),
+      sortAt: qAt,
+      faqLocal: true
+    },
+    {
+      role: "bot",
+      text: exchange.answer,
+      time: formatTime(aAt),
+      sortAt: aAt,
+      faqLocal: true,
+      faqForQuestion: exchange.question
+    }
+  ];
+}
+function compareMsgs(a, b) {
+  const ta = a.sortAt ?? "";
+  const tb = b.sortAt ?? "";
+  if (ta !== tb) return ta.localeCompare(tb);
+  if (a.role !== b.role) return a.role === "user" ? -1 : 1;
+  return 0;
+}
+function buildVisitorThread(ticketMsgs, faqExchanges) {
+  const faqMsgs = faqExchanges.flatMap(faqExchangeToMsgs);
+  return [...ticketMsgs, ...faqMsgs].sort(compareMsgs);
+}
+function isAiBotMessage(m) {
+  return m.role === "bot" && !m.isStaff && !m.faqLocal;
+}
+function splitTicketThreadHistory(messages) {
+  let lastAiIdx = -1;
+  for (let i = 0; i < messages.length; i += 1) {
+    if (isAiBotMessage(messages[i])) lastAiIdx = i;
+  }
+  if (lastAiIdx < 0) {
+    return { previous: [], current: messages };
+  }
+  return {
+    previous: messages.slice(0, lastAiIdx + 1),
+    current: messages.slice(lastAiIdx + 1)
+  };
+}
+
 // src/components/WidgetMainView.tsx
 import { Fragment, jsx as jsx10, jsxs as jsxs9 } from "react/jsx-runtime";
 var DEFAULT_GREETING2 = "Hi there!\nHow can we help you today?";
@@ -1029,6 +1120,17 @@ function WidgetMainView({
   const showWelcomePanel = !hasActiveTicket && messages.length === 0 && !ticketResolved;
   const isDark = themeSettings.isDarkMode;
   const headerSubSize = widgetHeaderSubFontSize(themeSettings.fontSizeBase);
+  const bodyFontSize = widgetBodyFontSize(themeSettings.fontSizeBase);
+  const [showPreviousConversation, setShowPreviousConversation] = useState2(false);
+  useEffect(() => {
+    setShowPreviousConversation(false);
+  }, [activeTicketId]);
+  const { previous: previousMessages, current: currentMessages } = useMemo(
+    () => hasActiveTicket ? splitTicketThreadHistory(messages) : { previous: [], current: messages },
+    [hasActiveTicket, messages]
+  );
+  const hasPreviousConversation = previousMessages.length > 0;
+  const displayMessages = hasActiveTicket && hasPreviousConversation && !showPreviousConversation ? currentMessages : messages;
   const layoutStyles = {
     ...styles,
     messagesArea: {
@@ -1169,11 +1271,42 @@ function WidgetMainView({
               compact: true
             }
           ) : /* @__PURE__ */ jsxs9(Fragment, { children: [
+            hasActiveTicket && hasPreviousConversation ? /* @__PURE__ */ jsx10(
+              "div",
+              {
+                style: {
+                  display: "flex",
+                  justifyContent: "center",
+                  padding: "10px 16px 0"
+                },
+                children: /* @__PURE__ */ jsx10(
+                  "button",
+                  {
+                    type: "button",
+                    onClick: () => setShowPreviousConversation((v) => !v),
+                    style: {
+                      background: "none",
+                      border: "none",
+                      padding: 0,
+                      margin: 0,
+                      cursor: "pointer",
+                      fontSize: bodyFontSize,
+                      fontWeight: 500,
+                      lineHeight: 1.4,
+                      color: themeSettings.primaryColor ?? "#006D77",
+                      textDecoration: "underline",
+                      textUnderlineOffset: 3
+                    },
+                    children: showPreviousConversation ? "Hide previous conversation" : "Show previous conversation"
+                  }
+                )
+              }
+            ) : null,
             /* @__PURE__ */ jsx10(
               MessageList,
               {
                 styles: layoutStyles,
-                messages,
+                messages: displayMessages,
                 showTyping,
                 messagesEndRef,
                 themeSettings,
@@ -1319,7 +1452,7 @@ function WidgetMainView({
 }
 
 // src/components/PreChatScreen.tsx
-import { useState as useState2 } from "react";
+import { useState as useState3 } from "react";
 
 // src/lib/email.ts
 function isValidEmail(value) {
@@ -1337,9 +1470,9 @@ function PreChatScreen({
   busy,
   error
 }) {
-  const [name, setName] = useState2("");
-  const [email, setEmail] = useState2("");
-  const [localError, setLocalError] = useState2(null);
+  const [name, setName] = useState3("");
+  const [email, setEmail] = useState3("");
+  const [localError, setLocalError] = useState3(null);
   const { headline, subtitle } = splitGreetingMessage(themeSettings.greetingMessage);
   const headerFontSize = themeSettings?.fontSizeBase ?? 28;
   const bodyFontSize = headerFontSize / 2;
@@ -1481,7 +1614,7 @@ function PreChatScreen({
 }
 
 // src/components/EscalateScreen.tsx
-import { useState as useState3 } from "react";
+import { useState as useState4 } from "react";
 import { ArrowLeft as ArrowLeft2 } from "lucide-react";
 import { Fragment as Fragment2, jsx as jsx12, jsxs as jsxs11 } from "react/jsx-runtime";
 function EscalateScreen({
@@ -1496,10 +1629,10 @@ function EscalateScreen({
   initialName,
   initialSummary
 }) {
-  const [summary, setSummary] = useState3(initialSummary ?? "");
-  const [email, setEmail] = useState3(initialEmail ?? "");
-  const [name, setName] = useState3(initialName ?? "");
-  const [localError, setLocalError] = useState3(null);
+  const [summary, setSummary] = useState4(initialSummary ?? "");
+  const [email, setEmail] = useState4(initialEmail ?? "");
+  const [name, setName] = useState4(initialName ?? "");
+  const [localError, setLocalError] = useState4(null);
   const formFontSize = widgetFormFontSize(themeSettings.fontSizeBase);
   const headerSubSize = widgetHeaderSubFontSize(themeSettings.fontSizeBase);
   return /* @__PURE__ */ jsxs11("div", { style: styles.chatScreen, children: [
@@ -1993,78 +2126,6 @@ async function postVisitorEscalate(apiBaseUrl, body) {
   return readEnvelope(json);
 }
 
-// src/lib/ticket-thread-ui.ts
-function formatTime(iso) {
-  if (!iso) {
-    return (/* @__PURE__ */ new Date()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  }
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) {
-    return (/* @__PURE__ */ new Date()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  }
-  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-}
-function ticketMessageToWidgetMsg(m) {
-  const sortAt = m.createdAt ?? (/* @__PURE__ */ new Date()).toISOString();
-  const time = formatTime(m.createdAt);
-  if (m.senderRole === "visitor") {
-    return { id: m.id, role: "user", text: m.text, time, sortAt };
-  }
-  if (m.senderRole === "bot") {
-    return {
-      id: m.id,
-      role: "bot",
-      text: m.text,
-      senderName: m.senderLabel || "AI Assistant",
-      time,
-      sortAt
-    };
-  }
-  const label = m.senderLabel && m.senderLabel !== "Unknown sender" && m.senderLabel !== "System" ? m.senderLabel : "Support";
-  return {
-    id: m.id,
-    role: "bot",
-    text: m.text,
-    senderName: parseStaffSenderName(label),
-    isStaff: true,
-    time,
-    sortAt
-  };
-}
-function faqExchangeToMsgs(exchange) {
-  const base = Date.parse(exchange.askedAt) || Date.now();
-  const qAt = new Date(base).toISOString();
-  const aAt = new Date(base + 1).toISOString();
-  return [
-    {
-      role: "user",
-      text: exchange.question,
-      time: formatTime(qAt),
-      sortAt: qAt,
-      faqLocal: true
-    },
-    {
-      role: "bot",
-      text: exchange.answer,
-      time: formatTime(aAt),
-      sortAt: aAt,
-      faqLocal: true,
-      faqForQuestion: exchange.question
-    }
-  ];
-}
-function compareMsgs(a, b) {
-  const ta = a.sortAt ?? "";
-  const tb = b.sortAt ?? "";
-  if (ta !== tb) return ta.localeCompare(tb);
-  if (a.role !== b.role) return a.role === "user" ? -1 : 1;
-  return 0;
-}
-function buildVisitorThread(ticketMsgs, faqExchanges) {
-  const faqMsgs = faqExchanges.flatMap(faqExchangeToMsgs);
-  return [...ticketMsgs, ...faqMsgs].sort(compareMsgs);
-}
-
 // src/lib/widget-storage-id.ts
 function widgetProjectStorageId(projectToken) {
   const token = projectToken?.trim();
@@ -2278,34 +2339,34 @@ function ChatWidget({
   const hasApi = hasWidgetApiBase(apiBaseUrl);
   const gateDefault = Boolean(hasApi && projectToken?.trim());
   const visitorGateEffective = visitorGate !== void 0 ? visitorGate : gateDefault;
-  const [open, setOpen] = useState4(false);
-  const [view, setView] = useState4(() => {
+  const [open, setOpen] = useState5(false);
+  const [view, setView] = useState5(() => {
     if (!visitorGateEffective) return "welcome";
     return "prechat";
   });
-  const [helpOpen, setHelpOpen] = useState4(false);
-  const [messages, setMessages] = useState4([]);
-  const [text, setText] = useState4("");
-  const [awaitingBot, setAwaitingBot] = useState4(false);
-  const [sending, setSending] = useState4(false);
-  const [visitor, setVisitor] = useState4(null);
-  const [prechatBusy, setPrechatBusy] = useState4(false);
-  const [prechatError, setPrechatError] = useState4(null);
-  const [escalateBusy, setEscalateBusy] = useState4(false);
-  const [remoteFaqs, setRemoteFaqs] = useState4(null);
-  const [capabilities, setCapabilities] = useState4({
+  const [helpOpen, setHelpOpen] = useState5(false);
+  const [messages, setMessages] = useState5([]);
+  const [text, setText] = useState5("");
+  const [awaitingBot, setAwaitingBot] = useState5(false);
+  const [sending, setSending] = useState5(false);
+  const [visitor, setVisitor] = useState5(null);
+  const [prechatBusy, setPrechatBusy] = useState5(false);
+  const [prechatError, setPrechatError] = useState5(null);
+  const [escalateBusy, setEscalateBusy] = useState5(false);
+  const [remoteFaqs, setRemoteFaqs] = useState5(null);
+  const [capabilities, setCapabilities] = useState5({
     aiChatEnabled: true,
     agentSupportEnabled: true
   });
-  const [ticketSummary, setTicketSummary] = useState4(null);
-  const [ratingBusy, setRatingBusy] = useState4(false);
-  const [ratingSkipped, setRatingSkipped] = useState4(false);
-  const [allowResolvedReply, setAllowResolvedReply] = useState4(false);
-  const [widgetUnavailable, setWidgetUnavailable] = useState4(null);
-  const [sessionReady, setSessionReady] = useState4(!visitorGateEffective);
-  const [inTicketThread, setInTicketThread] = useState4(false);
+  const [ticketSummary, setTicketSummary] = useState5(null);
+  const [ratingBusy, setRatingBusy] = useState5(false);
+  const [ratingSkipped, setRatingSkipped] = useState5(false);
+  const [allowResolvedReply, setAllowResolvedReply] = useState5(false);
+  const [widgetUnavailable, setWidgetUnavailable] = useState5(null);
+  const [sessionReady, setSessionReady] = useState5(!visitorGateEffective);
+  const [inTicketThread, setInTicketThread] = useState5(false);
   const interactionLockRef = useRef(false);
-  const [interactionLocked, setInteractionLocked] = useState4(false);
+  const [interactionLocked, setInteractionLocked] = useState5(false);
   const acquireInteractionLock = useCallback(() => {
     if (interactionLockRef.current) return false;
     interactionLockRef.current = true;
@@ -2320,7 +2381,7 @@ function ChatWidget({
     if (open2 && interactionLockRef.current) return;
     setHelpOpen(open2);
   }, []);
-  const [themeSettings, setThemeSettings] = useState4({
+  const [themeSettings, setThemeSettings] = useState5({
     isDarkMode: false,
     primaryColor: "#006D77",
     secondaryColor: "#006D7738",
@@ -2328,13 +2389,13 @@ function ChatWidget({
     isGradient: false,
     position: "bottom-right"
   });
-  useEffect(() => {
+  useEffect2(() => {
     if (!themeSettingsProp) return;
     setThemeSettings((prev) => ({ ...prev, ...themeSettingsProp }));
   }, [themeSettingsProp]);
   const themeSettingsPropRef = useRef(themeSettingsProp);
   themeSettingsPropRef.current = themeSettingsProp;
-  useEffect(() => {
+  useEffect2(() => {
     const tok = projectToken?.trim();
     if (!hasApi || apiBase === void 0 || !tok) return;
     let cancelled = false;
@@ -2369,7 +2430,7 @@ function ChatWidget({
       cancelled = true;
     };
   }, [apiBase, hasApi, projectToken]);
-  const faqs = useMemo(() => {
+  const faqs = useMemo2(() => {
     if (faqsProp && faqsProp.length > 0) return faqsProp;
     return remoteFaqs ?? [];
   }, [faqsProp, remoteFaqs]);
@@ -2414,7 +2475,7 @@ function ChatWidget({
       ticketSyncInFlightRef.current = false;
     }
   }, [apiBase, projectToken]);
-  useEffect(() => {
+  useEffect2(() => {
     if (!activeTicketId) {
       setTicketSummary(null);
       setRatingSkipped(false);
@@ -2424,12 +2485,12 @@ function ChatWidget({
     const skipped = typeof window !== "undefined" && sessionStorage.getItem(ratingSkipStorageKey(activeTicketId)) === "1";
     setRatingSkipped(skipped);
   }, [activeTicketId, ratingSkipStorageKey]);
-  useEffect(() => {
+  useEffect2(() => {
     if (ticketSummary?.status !== "resolved") {
       setAllowResolvedReply(false);
     }
   }, [ticketSummary?.status]);
-  useEffect(() => {
+  useEffect2(() => {
     if (!visitorGateEffective) {
       setSessionReady(true);
       return;
@@ -2503,12 +2564,12 @@ function ChatWidget({
       disconnectVisitorSocket();
     };
   }, [visitorGateEffective, projectToken, apiBase]);
-  useEffect(() => {
+  useEffect2(() => {
     if (visitor) {
       saveVisitorSession(visitor, projectToken);
     }
   }, [visitor, projectToken]);
-  useEffect(() => {
+  useEffect2(() => {
     if (!sessionReady || !open || view !== "main" || !viewingTicketThread || !visitorAccessToken) return;
     void syncTicketThread();
     const id = window.setInterval(() => {
@@ -2516,7 +2577,7 @@ function ChatWidget({
     }, 12e3);
     return () => window.clearInterval(id);
   }, [sessionReady, open, view, viewingTicketThread, visitorAccessToken, syncTicketThread]);
-  useEffect(() => {
+  useEffect2(() => {
     const token = visitorAccessToken;
     if (apiBase === void 0 || !apiBase || !token) return;
     ensureVisitorSocket(apiBase, token);
@@ -2550,11 +2611,11 @@ function ChatWidget({
       unsubTicket();
     };
   }, [apiBase, visitorAccessToken, projectToken, syncTicketThread]);
-  const collectIdentityOnEscalate = useMemo(
+  const collectIdentityOnEscalate = useMemo2(
     () => !visitor || !visitor.email,
     [visitor]
   );
-  useEffect(() => {
+  useEffect2(() => {
     function onDocClick(e) {
       if (!open) return;
       if (!panelRef.current) return;
@@ -2573,7 +2634,7 @@ function ChatWidget({
     document.addEventListener("mousedown", onDocClick);
     return () => document.removeEventListener("mousedown", onDocClick);
   }, [open, visitorGateEffective]);
-  useEffect(() => {
+  useEffect2(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
   const nowTime = () => (/* @__PURE__ */ new Date()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
