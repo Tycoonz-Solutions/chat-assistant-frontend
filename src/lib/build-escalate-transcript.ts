@@ -12,6 +12,7 @@ export function buildEscalateTranscript(messages: Msg[]): EscalateTranscriptTurn
     .filter(
       (m) =>
         !m.faqLocal &&
+        !m.ticketCreatedNotice &&
         !m.isStaff &&
         (m.role === "user" || m.role === "bot") &&
         m.text.trim().length > 0,

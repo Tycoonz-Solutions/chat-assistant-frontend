@@ -13,6 +13,11 @@ import {
   buildEscalateTranscript,
   lastUserMessageForEscalate,
 } from "./lib/build-escalate-transcript";
+import {
+  clearTicketCreatedNotice,
+  markTicketCreatedNotice,
+  withTicketCreatedNotice,
+} from "./lib/ticket-created-notice";
 import type { FAQ, Msg, ChatFAQWidgetProps, ThemeSettings } from "../types/index";
 import {
   fetchWidgetConfig,
@@ -212,6 +217,7 @@ export default function ChatWidget({
   const visitorAccessToken = visitor?.accessToken ?? null;
 
   const ticketSyncInFlightRef = useRef(false);
+  const ticketSyncQueuedRef = useRef(false);
 
   const ratingSkipStorageKey = useCallback(
     (ticketId: string) => {
@@ -224,7 +230,10 @@ export default function ChatWidget({
     const tid = visitorRef.current?.ticketId;
     const token = visitorRef.current?.accessToken;
     if (apiBase === undefined || !tid || !token) return;
-    if (ticketSyncInFlightRef.current) return;
+    if (ticketSyncInFlightRef.current) {
+      ticketSyncQueuedRef.current = true;
+      return;
+    }
 
     ticketSyncInFlightRef.current = true;
     try {
@@ -234,12 +243,23 @@ export default function ChatWidget({
       ]);
       const ticketMsgs = rows.map(ticketMessageToWidgetMsg);
       const faqExchanges = loadFaqTranscript(projectToken, tid);
-      setMessages(buildVisitorThread(ticketMsgs, faqExchanges));
+      const thread = withTicketCreatedNotice(
+        buildVisitorThread(ticketMsgs, faqExchanges),
+        projectToken,
+        String(tid),
+        () =>
+          new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      );
+      setMessages(thread);
       setTicketSummary(summary);
     } catch (err) {
       console.warn("[ChatWidget] Could not sync ticket messages", err);
     } finally {
       ticketSyncInFlightRef.current = false;
+      if (ticketSyncQueuedRef.current) {
+        ticketSyncQueuedRef.current = false;
+        void syncTicketThread();
+      }
     }
   }, [apiBase, projectToken]);
 
@@ -970,6 +990,7 @@ export default function ChatWidget({
     if (oldTicketId) {
       dismissTicket(projectToken, oldTicketId);
       clearFaqTranscript(projectToken, oldTicketId);
+      clearTicketCreatedNotice(projectToken, oldTicketId);
     }
 
     const profile = {
@@ -1031,6 +1052,7 @@ export default function ChatWidget({
         ticketId: r.ticketId ?? null,
       };
       if (r.ticketId && r.accessToken) {
+        markTicketCreatedNotice(projectToken, String(r.ticketId));
         setInTicketThread(true);
         await syncTicketThread();
       } else {
@@ -1218,6 +1240,7 @@ export default function ChatWidget({
             interactionLocked={interactionLocked}
             hasActiveTicket={viewingTicketThread}
             activeTicketId={viewingTicketThread ? activeTicketId : null}
+            ticketStatus={viewingTicketThread ? ticketSummary?.status ?? null : null}
             resumableTicketId={resumableTicketId}
             onResumeTicket={() => void handleResumeTicket()}
             ticketResolved={viewingTicketThread && ticketResolved}

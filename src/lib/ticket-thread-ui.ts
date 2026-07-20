@@ -86,7 +86,7 @@ export function buildVisitorThread(
 }
 
 function isAiBotMessage(m: Msg): boolean {
-  return m.role === "bot" && !m.isStaff && !m.faqLocal;
+  return m.role === "bot" && !m.isStaff && !m.faqLocal && !m.ticketCreatedNotice;
 }
 
 /**

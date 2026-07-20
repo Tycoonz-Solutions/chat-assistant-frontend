@@ -12,6 +12,7 @@ import {
   widgetHeaderSubFontSize,
 } from "../lib/widget-font-size";
 import { splitTicketThreadHistory } from "../lib/ticket-thread-ui";
+import { formatVisitorTicketStatus } from "../lib/ticket-created-notice";
 
 const DEFAULT_GREETING = "Hi there!\nHow can we help you today?";
 
@@ -40,6 +41,8 @@ type Props = {
   interactionLocked?: boolean;
   hasActiveTicket: boolean;
   activeTicketId?: string | null;
+  /** Raw ticket status from API (open / new / in_progress / resolved). */
+  ticketStatus?: string | null;
   /** Open ticket available to resume without forcing the visitor into the thread. */
   resumableTicketId?: string | null;
   onResumeTicket?: () => void;
@@ -77,6 +80,7 @@ export default function WidgetMainView({
   interactionLocked = false,
   hasActiveTicket,
   activeTicketId = null,
+  ticketStatus = null,
   resumableTicketId = null,
   onResumeTicket,
   ticketResolved = false,
@@ -173,13 +177,15 @@ export default function WidgetMainView({
               lineHeight: 1.4,
             }}
           >
-            {ticketResolved
-              ? "This conversation is resolved"
-              : hasActiveTicket && activeTicketId
-                ? `Ticket ${formatTicketId(activeTicketId)} · Continue your conversation`
-                : hasActiveTicket
-                  ? "Continue your conversation"
-                  : subtitle || headline}
+            {hasActiveTicket && activeTicketId
+              ? `Ticket ${formatTicketId(activeTicketId)} · Status: ${formatVisitorTicketStatus(
+                  ticketResolved ? "resolved" : ticketStatus,
+                )}`
+              : hasActiveTicket
+                ? `Status: ${formatVisitorTicketStatus(
+                    ticketResolved ? "resolved" : ticketStatus,
+                  )}`
+                : subtitle || headline}
           </div>
         </div>
         {canEscalate && onContactSupport && !hasActiveTicket && !resumableTicketId ? (

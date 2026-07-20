@@ -1051,7 +1051,7 @@ function buildVisitorThread(ticketMsgs, faqExchanges) {
   return [...ticketMsgs, ...faqMsgs].sort(compareMsgs);
 }
 function isAiBotMessage(m) {
-  return m.role === "bot" && !m.isStaff && !m.faqLocal;
+  return m.role === "bot" && !m.isStaff && !m.faqLocal && !m.ticketCreatedNotice;
 }
 function splitTicketThreadHistory(messages) {
   let lastAiIdx = -1;
@@ -1065,6 +1065,72 @@ function splitTicketThreadHistory(messages) {
     previous: messages.slice(0, lastAiIdx + 1),
     current: messages.slice(lastAiIdx + 1)
   };
+}
+
+// src/lib/widget-storage-id.ts
+function widgetProjectStorageId(projectToken) {
+  const token = projectToken?.trim();
+  return token || "default";
+}
+
+// src/lib/ticket-created-notice.ts
+function formatVisitorTicketStatus(status) {
+  const s = (status || "open").trim().toLowerCase();
+  if (s === "new") return "New";
+  if (s === "in_progress" || s === "in-progress") return "In Progress";
+  if (s === "resolved") return "Resolved";
+  return "Open";
+}
+function noticeStorageKey(projectToken, ticketId) {
+  return `chat-widget-ticket-created-notice-${widgetProjectStorageId(projectToken)}-${ticketId}`;
+}
+function markTicketCreatedNotice(projectToken, ticketId) {
+  if (typeof window === "undefined" || !ticketId) return;
+  try {
+    sessionStorage.setItem(noticeStorageKey(projectToken, ticketId), "1");
+  } catch {
+  }
+}
+function clearTicketCreatedNotice(projectToken, ticketId) {
+  if (typeof window === "undefined" || !ticketId) return;
+  try {
+    sessionStorage.removeItem(noticeStorageKey(projectToken, ticketId));
+  } catch {
+  }
+}
+function shouldShowTicketCreatedNotice(projectToken, ticketId) {
+  if (typeof window === "undefined" || !ticketId) return false;
+  try {
+    return sessionStorage.getItem(noticeStorageKey(projectToken, ticketId)) === "1";
+  } catch {
+    return false;
+  }
+}
+function buildTicketCreatedNoticeMsg(ticketId, nowTime) {
+  const idLabel = formatTicketId(ticketId);
+  const text = [
+    "Your support ticket has been created successfully.",
+    "",
+    `Ticket ID: ${idLabel}`,
+    "",
+    "Our support team has been notified and will respond during working hours. You will receive an email notification once an agent replies.",
+    "",
+    "Estimated Response Time: Within 24 hours."
+  ].join("\n");
+  return {
+    id: `ticket-created-notice-${ticketId}`,
+    role: "bot",
+    text,
+    time: nowTime(),
+    sortAt: (/* @__PURE__ */ new Date()).toISOString(),
+    ticketCreatedNotice: true,
+    senderName: "Support"
+  };
+}
+function withTicketCreatedNotice(thread, projectToken, ticketId, nowTime) {
+  if (!shouldShowTicketCreatedNotice(projectToken, ticketId)) return thread;
+  if (thread.some((m) => m.ticketCreatedNotice)) return thread;
+  return [...thread, buildTicketCreatedNoticeMsg(ticketId, nowTime)];
 }
 
 // src/components/WidgetMainView.tsx
@@ -1094,6 +1160,7 @@ function WidgetMainView({
   interactionLocked = false,
   hasActiveTicket,
   activeTicketId = null,
+  ticketStatus = null,
   resumableTicketId = null,
   onResumeTicket,
   ticketResolved = false,
@@ -1168,7 +1235,11 @@ function WidgetMainView({
               marginTop: 2,
               lineHeight: 1.4
             },
-            children: ticketResolved ? "This conversation is resolved" : hasActiveTicket && activeTicketId ? `Ticket ${formatTicketId(activeTicketId)} \xB7 Continue your conversation` : hasActiveTicket ? "Continue your conversation" : subtitle || headline
+            children: hasActiveTicket && activeTicketId ? `Ticket ${formatTicketId(activeTicketId)} \xB7 Status: ${formatVisitorTicketStatus(
+              ticketResolved ? "resolved" : ticketStatus
+            )}` : hasActiveTicket ? `Status: ${formatVisitorTicketStatus(
+              ticketResolved ? "resolved" : ticketStatus
+            )}` : subtitle || headline
           }
         )
       ] }),
@@ -1801,7 +1872,7 @@ function EscalateScreen({
 // src/lib/build-escalate-transcript.ts
 function buildEscalateTranscript(messages) {
   return messages.filter(
-    (m) => !m.faqLocal && !m.isStaff && (m.role === "user" || m.role === "bot") && m.text.trim().length > 0
+    (m) => !m.faqLocal && !m.ticketCreatedNotice && !m.isStaff && (m.role === "user" || m.role === "bot") && m.text.trim().length > 0
   ).map((m) => ({
     role: m.role === "user" ? "user" : "assistant",
     content: m.text.trim(),
@@ -2126,12 +2197,6 @@ async function postVisitorEscalate(apiBaseUrl, body) {
   return readEnvelope(json);
 }
 
-// src/lib/widget-storage-id.ts
-function widgetProjectStorageId(projectToken) {
-  const token = projectToken?.trim();
-  return token || "default";
-}
-
 // src/lib/faq-transcript.ts
 function storageKey(projectToken, ticketId) {
   return `chat-widget-faq-${widgetProjectStorageId(projectToken)}-${ticketId}`;
@@ -2448,6 +2513,7 @@ function ChatWidget({
   );
   const visitorAccessToken = visitor?.accessToken ?? null;
   const ticketSyncInFlightRef = useRef(false);
+  const ticketSyncQueuedRef = useRef(false);
   const ratingSkipStorageKey = useCallback(
     (ticketId) => {
       return `chat-widget-rating-skipped-${widgetProjectStorageId(projectToken)}-${ticketId}`;
@@ -2458,7 +2524,10 @@ function ChatWidget({
     const tid = visitorRef.current?.ticketId;
     const token = visitorRef.current?.accessToken;
     if (apiBase === void 0 || !tid || !token) return;
-    if (ticketSyncInFlightRef.current) return;
+    if (ticketSyncInFlightRef.current) {
+      ticketSyncQueuedRef.current = true;
+      return;
+    }
     ticketSyncInFlightRef.current = true;
     try {
       const [rows, summary] = await Promise.all([
@@ -2467,12 +2536,22 @@ function ChatWidget({
       ]);
       const ticketMsgs = rows.map(ticketMessageToWidgetMsg);
       const faqExchanges = loadFaqTranscript(projectToken, tid);
-      setMessages(buildVisitorThread(ticketMsgs, faqExchanges));
+      const thread = withTicketCreatedNotice(
+        buildVisitorThread(ticketMsgs, faqExchanges),
+        projectToken,
+        String(tid),
+        () => (/* @__PURE__ */ new Date()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+      );
+      setMessages(thread);
       setTicketSummary(summary);
     } catch (err) {
       console.warn("[ChatWidget] Could not sync ticket messages", err);
     } finally {
       ticketSyncInFlightRef.current = false;
+      if (ticketSyncQueuedRef.current) {
+        ticketSyncQueuedRef.current = false;
+        void syncTicketThread();
+      }
     }
   }, [apiBase, projectToken]);
   useEffect2(() => {
@@ -3110,6 +3189,7 @@ function ChatWidget({
     if (oldTicketId) {
       dismissTicket(projectToken, oldTicketId);
       clearFaqTranscript(projectToken, oldTicketId);
+      clearTicketCreatedNotice(projectToken, oldTicketId);
     }
     const profile = {
       email: current.email,
@@ -3165,6 +3245,7 @@ function ChatWidget({
         ticketId: r.ticketId ?? null
       };
       if (r.ticketId && r.accessToken) {
+        markTicketCreatedNotice(projectToken, String(r.ticketId));
         setInTicketThread(true);
         await syncTicketThread();
       } else {
@@ -3351,6 +3432,7 @@ function ChatWidget({
               interactionLocked,
               hasActiveTicket: viewingTicketThread,
               activeTicketId: viewingTicketThread ? activeTicketId : null,
+              ticketStatus: viewingTicketThread ? ticketSummary?.status ?? null : null,
               resumableTicketId,
               onResumeTicket: () => void handleResumeTicket(),
               ticketResolved: viewingTicketThread && ticketResolved,

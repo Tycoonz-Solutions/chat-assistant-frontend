@@ -10,6 +10,8 @@ export type Msg = {
   /** FAQ quick-help row (not sent to agent ticket) */
   faqLocal?: boolean;
   faqForQuestion?: string;
+  /** Local confirmation after escalate (widget-only, not sent to agent) */
+  ticketCreatedNotice?: boolean;
   /** Live agent / staff name shown above the message bubble */
   senderName?: string;
   isStaff?: boolean;
