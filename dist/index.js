@@ -41,7 +41,7 @@ __export(index_exports, {
 module.exports = __toCommonJS(index_exports);
 
 // src/ChatWidget.tsx
-var import_react6 = require("react");
+var import_react7 = require("react");
 
 // src/components/FloatingButton.tsx
 var import_lucide_react = require("lucide-react");
@@ -360,8 +360,71 @@ function widgetWelcomeHeadlineSize(fontSizeBase) {
   return fontSizeBase ?? 28;
 }
 
-// src/components/MessageList.tsx
+// src/components/LinkifiedText.tsx
+var import_react2 = require("react");
 var import_jsx_runtime3 = require("react/jsx-runtime");
+var URL_RE = /\b((?:https?:\/\/|www\.)[^\s<>"'`]+)/gi;
+function trimTrailingPunctuation(url) {
+  let core = url;
+  let trailing = "";
+  while (/[),.;:!?'"\]]$/u.test(core)) {
+    trailing = core.slice(-1) + trailing;
+    core = core.slice(0, -1);
+  }
+  return { hrefCore: core, trailing };
+}
+function toHref(raw) {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (/^www\./i.test(trimmed)) return `https://${trimmed}`;
+  return null;
+}
+function LinkifiedText({ text }) {
+  const raw = text ?? "";
+  if (!raw) return null;
+  const nodes = [];
+  let lastIndex = 0;
+  let match;
+  const re = new RegExp(URL_RE.source, URL_RE.flags);
+  while ((match = re.exec(raw)) !== null) {
+    const full = match[1] ?? match[0];
+    const start = match.index;
+    if (start > lastIndex) {
+      nodes.push(raw.slice(lastIndex, start));
+    }
+    const { hrefCore, trailing } = trimTrailingPunctuation(full);
+    const href = toHref(hrefCore);
+    if (href && hrefCore) {
+      nodes.push(
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+          "a",
+          {
+            href,
+            target: "_blank",
+            rel: "noopener noreferrer",
+            className: "chat-message-link",
+            children: hrefCore
+          },
+          `link-${start}-${hrefCore}`
+        )
+      );
+      if (trailing) nodes.push(trailing);
+    } else {
+      nodes.push(full);
+    }
+    lastIndex = start + full.length;
+  }
+  if (lastIndex < raw.length) {
+    nodes.push(raw.slice(lastIndex));
+  }
+  return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(import_jsx_runtime3.Fragment, { children: nodes.map(
+    (node, i) => typeof node === "string" ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(import_react2.Fragment, { children: node }, `t-${i}`) : node
+  ) });
+}
+
+// src/components/MessageList.tsx
+var import_jsx_runtime4 = require("react/jsx-runtime");
 function MessageList({
   styles,
   messages,
@@ -373,8 +436,8 @@ function MessageList({
 }) {
   const nowTime = () => (/* @__PURE__ */ new Date()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   const defaultAvatarSrc = widgetBotAvatarUrl(apiBaseUrl, themeSettings.botAvatarUrl);
-  return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { style: styles.messagesArea, className: "hide-scrollbar", children: [
-    messages.length === 0 && !hideEmptyPlaceholder && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { style: {
+  return /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { style: styles.messagesArea, className: "hide-scrollbar", children: [
+    messages.length === 0 && !hideEmptyPlaceholder && /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { style: {
       textAlign: "center",
       color: themeSettings?.isDarkMode ? "#fff" : "#718096",
       fontSize: widgetBodyFontSize(themeSettings?.fontSizeBase),
@@ -384,8 +447,8 @@ function MessageList({
       const isBot = msg.role === "bot";
       const showStaffName = isBot && msg.isStaff && msg.senderName;
       const avatarSrc = msg.isStaff && resolveWidgetAssetUrl(apiBaseUrl, msg.senderAvatar) || defaultAvatarSrc;
-      return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: `message-row ${isBot ? "bot" : "user"}`, children: [
-        isBot && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "bot-avatar", "aria-hidden": true, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+      return /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: `message-row ${isBot ? "bot" : "user"}`, children: [
+        isBot && /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { className: "bot-avatar", "aria-hidden": true, children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
           "img",
           {
             src: avatarSrc,
@@ -398,8 +461,8 @@ function MessageList({
             }
           }
         ) }),
-        /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: `message-content ${isBot ? "bot" : "user"}`, children: [
-          showStaffName ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: `message-content ${isBot ? "bot" : "user"}`, children: [
+          showStaffName ? /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
             "div",
             {
               style: {
@@ -412,48 +475,48 @@ function MessageList({
               children: msg.senderName
             }
           ) : null,
-          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
             "div",
             {
               className: "message-bubble",
               style: isBot ? styles.botMessageBubble : styles.userMessageBubble,
-              children: msg.text
+              children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(LinkifiedText, { text: msg.text })
             }
           ),
-          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { style: { ...styles.timeText, alignSelf: isBot ? "flex-start" : "flex-end" }, children: msg.time ?? nowTime() })
+          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { style: { ...styles.timeText, alignSelf: isBot ? "flex-start" : "flex-end" }, children: msg.time ?? nowTime() })
         ] })
       ] }, msg.id ?? `local-${idx}`);
     }),
-    showTyping && /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { style: {
+    showTyping && /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { style: {
       display: "flex",
       gap: 8,
       alignItems: "center",
       alignSelf: "flex-start"
     }, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "bot-avatar", "aria-hidden": true, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("img", { src: defaultAvatarSrc, alt: "" }) }),
-      /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { style: {
+      /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { className: "bot-avatar", "aria-hidden": true, children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("img", { src: defaultAvatarSrc, alt: "" }) }),
+      /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { style: {
         background: themeSettings?.isDarkMode ? "#383737ff" : "#d1e7e8",
         padding: "12px 16px",
         borderRadius: "16px 16px 16px 4px",
         fontSize: themeSettings?.fontSizeBase ? themeSettings?.fontSizeBase / 2 + 4 : 14,
         color: "#4a5568"
       }, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { style: { display: "flex", gap: 4 }, children: [
-          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { style: {
+        /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { style: { display: "flex", gap: 4 }, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { style: {
             width: 8,
             height: 8,
             borderRadius: "50%",
             background: themeSettings.isGradient ? `linear-gradient(90deg, ${themeSettings.primaryColor}, ${themeSettings.secondaryColor})` : themeSettings.primaryColor ?? "#006D77",
             animation: "pulse 1.4s ease-in-out infinite"
           } }),
-          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { style: {
+          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { style: {
             width: 8,
             height: 8,
             borderRadius: "50%",
             background: themeSettings.isGradient ? `linear-gradient(90deg, ${themeSettings.primaryColor}, ${themeSettings.secondaryColor})` : themeSettings.primaryColor ?? "#006D77",
             animation: "pulse 1.4s ease-in-out 0.2s infinite"
           } }),
-          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { style: {
+          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { style: {
             width: 8,
             height: 8,
             borderRadius: "50%",
@@ -461,16 +524,16 @@ function MessageList({
             animation: "pulse 1.4s ease-in-out 0.4s infinite"
           } })
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { style: { ...styles.timeText, marginTop: 8 }, children: nowTime() })
+        /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { style: { ...styles.timeText, marginTop: 8 }, children: nowTime() })
       ] })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { ref: messagesEndRef })
+    /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { ref: messagesEndRef })
   ] });
 }
 
 // src/components/InputArea.tsx
 var import_lucide_react3 = require("lucide-react");
-var import_jsx_runtime4 = require("react/jsx-runtime");
+var import_jsx_runtime5 = require("react/jsx-runtime");
 function InputArea({
   styles,
   text,
@@ -479,11 +542,11 @@ function InputArea({
   loading,
   themeSettings
 }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { style: styles.inputArea, children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("form", { onSubmit: (e) => {
+  return /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { style: styles.inputArea, children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("form", { onSubmit: (e) => {
     e.preventDefault();
     onSend(e);
-  }, children: /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { style: styles.inputWrapper, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+  }, children: /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { style: styles.inputWrapper, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
       "input",
       {
         value: text,
@@ -494,7 +557,7 @@ function InputArea({
         disabled: loading
       }
     ),
-    /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(
+    /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(
       "button",
       {
         type: "submit",
@@ -515,7 +578,7 @@ function InputArea({
           e.currentTarget.style.background = themeSettings?.isGradient ? `linear-gradient(90deg, ${themeSettings.primaryColor}, ${themeSettings.secondaryColor})` : themeSettings.primaryColor;
         },
         children: [
-          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(import_lucide_react3.Send, { size: 18 }),
+          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(import_lucide_react3.Send, { size: 18 }),
           " Send"
         ]
       }
@@ -524,7 +587,7 @@ function InputArea({
 }
 
 // src/components/ChatScreen.tsx
-var import_jsx_runtime5 = require("react/jsx-runtime");
+var import_jsx_runtime6 = require("react/jsx-runtime");
 function ChatScreen({
   styles,
   title,
@@ -542,10 +605,10 @@ function ChatScreen({
   interactionLocked = false,
   apiBaseUrl
 }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { style: styles.chatScreen, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { style: styles.header, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { style: { display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0 }, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { style: styles.chatScreen, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { style: styles.header, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { style: { display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0 }, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
           "button",
           {
             type: "button",
@@ -570,11 +633,11 @@ function ChatScreen({
             onMouseLeave: (e) => {
               e.currentTarget.style.background = "transparent";
             },
-            children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(import_lucide_react4.ArrowLeft, { size: 20 })
+            children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(import_lucide_react4.ArrowLeft, { size: 20 })
           }
         ),
-        /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { style: { minWidth: 0 }, children: [
-          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { style: { minWidth: 0 }, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
             "div",
             {
               style: {
@@ -584,7 +647,7 @@ function ChatScreen({
               children: title
             }
           ),
-          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
             "div",
             {
               style: {
@@ -596,7 +659,7 @@ function ChatScreen({
           )
         ] })
       ] }),
-      canEscalate && onContactSupport ? /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+      canEscalate && onContactSupport ? /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
         "button",
         {
           type: "button",
@@ -617,7 +680,7 @@ function ChatScreen({
         }
       ) : null
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
       MessageList,
       {
         styles,
@@ -628,7 +691,7 @@ function ChatScreen({
         apiBaseUrl
       }
     ),
-    canEscalate && onContactSupport ? /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+    canEscalate && onContactSupport ? /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
       "div",
       {
         style: {
@@ -637,7 +700,7 @@ function ChatScreen({
           textAlign: "center",
           background: themeSettings?.isDarkMode ? "#2b2b2b" : "#f8f8f8"
         },
-        children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+        children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
           "button",
           {
             type: "button",
@@ -657,7 +720,7 @@ function ChatScreen({
         )
       }
     ) : null,
-    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
       InputArea,
       {
         styles,
@@ -672,11 +735,11 @@ function ChatScreen({
 }
 
 // src/components/WidgetMainView.tsx
-var import_react3 = require("react");
+var import_react4 = require("react");
 
 // src/components/FaqListPanel.tsx
 var import_lucide_react5 = require("lucide-react");
-var import_jsx_runtime6 = require("react/jsx-runtime");
+var import_jsx_runtime7 = require("react/jsx-runtime");
 function FaqListPanel({
   styles,
   faqs,
@@ -685,7 +748,7 @@ function FaqListPanel({
   compact = false,
   disabled = false
 }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
+  return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
     "div",
     {
       className: "hide-scrollbar",
@@ -697,7 +760,7 @@ function FaqListPanel({
         background: themeSettings?.isDarkMode ? "#2b2b2b" : "#f8f8f8"
       },
       children: [
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
           "div",
           {
             style: {
@@ -707,8 +770,8 @@ function FaqListPanel({
               marginBottom: 12
             },
             children: [
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(import_lucide_react5.List, { size: 18, color: themeSettings.primaryColor ?? "#006D77" }),
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_lucide_react5.List, { size: 18, color: themeSettings.primaryColor ?? "#006D77" }),
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
                 "h3",
                 {
                   style: {
@@ -723,7 +786,7 @@ function FaqListPanel({
             ]
           }
         ),
-        faqs.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+        faqs.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
           "p",
           {
             style: {
@@ -735,7 +798,7 @@ function FaqListPanel({
             },
             children: "No FAQs yet. Start a conversation and our team will help you."
           }
-        ) : /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { style: { display: "flex", flexDirection: "column", gap: 8 }, children: faqs.map((faq, index) => /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+        ) : /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { style: { display: "flex", flexDirection: "column", gap: 8 }, children: faqs.map((faq, index) => /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
           "button",
           {
             type: "button",
@@ -752,7 +815,7 @@ function FaqListPanel({
               if (disabled) return;
               onSelectFAQ(faq);
             },
-            children: /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
+            children: /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
               "div",
               {
                 style: {
@@ -763,7 +826,7 @@ function FaqListPanel({
                   gap: 8
                 },
                 children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+                  /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
                     "span",
                     {
                       style: {
@@ -775,7 +838,7 @@ function FaqListPanel({
                       children: faq.question
                     }
                   ),
-                  /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+                  /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
                     import_lucide_react5.ChevronRight,
                     {
                       size: 18,
@@ -795,11 +858,11 @@ function FaqListPanel({
 
 // src/components/HelpChip.tsx
 var import_lucide_react6 = require("lucide-react");
-var import_jsx_runtime7 = require("react/jsx-runtime");
+var import_jsx_runtime8 = require("react/jsx-runtime");
 function HelpChip({ active, onClick, themeSettings, disabled = false }) {
   const primary = themeSettings.primaryColor ?? "#006D77";
   const isDark = themeSettings.isDarkMode;
-  return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
+  return /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
     "button",
     {
       type: "button",
@@ -828,7 +891,7 @@ function HelpChip({ active, onClick, themeSettings, disabled = false }) {
         outline: "none"
       },
       children: [
-        active ? /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_lucide_react6.X, { size: 16, "aria-hidden": true }) : /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_lucide_react6.HelpCircle, { size: 16, "aria-hidden": true }),
+        active ? /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_lucide_react6.X, { size: 16, "aria-hidden": true }) : /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_lucide_react6.HelpCircle, { size: 16, "aria-hidden": true }),
         active ? "Back to chat" : "Quick help"
       ]
     }
@@ -836,23 +899,23 @@ function HelpChip({ active, onClick, themeSettings, disabled = false }) {
 }
 
 // src/components/ConversationRatingPrompt.tsx
-var import_react2 = require("react");
-var import_jsx_runtime8 = require("react/jsx-runtime");
+var import_react3 = require("react");
+var import_jsx_runtime9 = require("react/jsx-runtime");
 function ConversationRatingPrompt({
   themeSettings,
   busy,
   onSubmit,
   onSkip
 }) {
-  const [hovered, setHovered] = (0, import_react2.useState)(0);
-  const [selected, setSelected] = (0, import_react2.useState)(0);
+  const [hovered, setHovered] = (0, import_react3.useState)(0);
+  const [selected, setSelected] = (0, import_react3.useState)(0);
   const primary = themeSettings.primaryColor ?? "#006D77";
   const isDark = themeSettings.isDarkMode;
   async function handleSubmit() {
     if (!selected || busy) return;
     await onSubmit(selected);
   }
-  return /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
+  return /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)(
     "div",
     {
       style: {
@@ -863,7 +926,7 @@ function ConversationRatingPrompt({
         background: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,109,119,0.06)"
       },
       children: [
-        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
           "p",
           {
             style: {
@@ -875,7 +938,7 @@ function ConversationRatingPrompt({
             children: "How was your conversation?"
           }
         ),
-        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
           "p",
           {
             style: {
@@ -886,7 +949,7 @@ function ConversationRatingPrompt({
             children: "Rate your experience after this chat has ended."
           }
         ),
-        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
           "div",
           {
             style: { display: "flex", alignItems: "center", gap: 6, marginBottom: 12 },
@@ -894,7 +957,7 @@ function ConversationRatingPrompt({
             "aria-label": "Rate your conversation from 1 to 5 stars",
             children: [1, 2, 3, 4, 5].map((star) => {
               const active = star <= (hovered || selected);
-              return /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+              return /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
                 "button",
                 {
                   type: "button",
@@ -921,8 +984,8 @@ function ConversationRatingPrompt({
             })
           }
         ),
-        /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { style: { display: "flex", gap: 8, justifyContent: "flex-end" }, children: [
-          /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { style: { display: "flex", gap: 8, justifyContent: "flex-end" }, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
             "button",
             {
               type: "button",
@@ -939,7 +1002,7 @@ function ConversationRatingPrompt({
               children: "Skip"
             }
           ),
-          /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
             "button",
             {
               type: "button",
@@ -972,7 +1035,7 @@ function formatTicketId(id) {
 }
 
 // src/components/WelcomeMessagePanel.tsx
-var import_jsx_runtime9 = require("react/jsx-runtime");
+var import_jsx_runtime10 = require("react/jsx-runtime");
 function WelcomeMessagePanel({
   themeSettings,
   compact = false
@@ -981,7 +1044,7 @@ function WelcomeMessagePanel({
   const headlineSize = widgetWelcomeHeadlineSize(themeSettings.fontSizeBase);
   const bodySize = widgetBodyFontSize(themeSettings.fontSizeBase);
   const isDark = themeSettings.isDarkMode;
-  return /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)(
+  return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
     "div",
     {
       style: {
@@ -993,7 +1056,7 @@ function WelcomeMessagePanel({
         boxShadow: isDark ? "0 4px 16px rgba(0,0,0,0.25)" : "0 4px 16px rgba(0,0,0,0.08)"
       },
       children: [
-        /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
           "div",
           {
             style: {
@@ -1005,7 +1068,7 @@ function WelcomeMessagePanel({
             children: headline
           }
         ),
-        subtitle ? /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
+        subtitle ? /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
           "p",
           {
             style: {
@@ -1185,7 +1248,7 @@ function withTicketCreatedNotice(thread, projectToken, ticketId, nowTime) {
 }
 
 // src/components/WidgetMainView.tsx
-var import_jsx_runtime10 = require("react/jsx-runtime");
+var import_jsx_runtime11 = require("react/jsx-runtime");
 var DEFAULT_GREETING2 = "Hi there!\nHow can we help you today?";
 function splitGreeting(raw) {
   const t = (raw ?? "").trim() || DEFAULT_GREETING2;
@@ -1239,11 +1302,11 @@ function WidgetMainView({
   const isDark = themeSettings.isDarkMode;
   const headerSubSize = widgetHeaderSubFontSize(themeSettings.fontSizeBase);
   const bodyFontSize = widgetBodyFontSize(themeSettings.fontSizeBase);
-  const [showPreviousConversation, setShowPreviousConversation] = (0, import_react3.useState)(false);
-  (0, import_react3.useEffect)(() => {
+  const [showPreviousConversation, setShowPreviousConversation] = (0, import_react4.useState)(false);
+  (0, import_react4.useEffect)(() => {
     setShowPreviousConversation(false);
   }, [activeTicketId]);
-  const { previous: previousMessages, current: currentMessages } = (0, import_react3.useMemo)(
+  const { previous: previousMessages, current: currentMessages } = (0, import_react4.useMemo)(
     () => hasActiveTicket ? splitTicketThreadHistory(messages) : { previous: [], current: messages },
     [hasActiveTicket, messages]
   );
@@ -1264,10 +1327,10 @@ function WidgetMainView({
       padding: "0 0 16px"
     }
   };
-  return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { style: styles.chatScreen, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { style: styles.header, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { style: { minWidth: 0, flex: 1 }, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { style: styles.chatScreen, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { style: styles.header, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { style: { minWidth: 0, flex: 1 }, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
           "div",
           {
             style: {
@@ -1277,7 +1340,7 @@ function WidgetMainView({
             children: title
           }
         ),
-        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
           "div",
           {
             style: {
@@ -1294,7 +1357,7 @@ function WidgetMainView({
           }
         )
       ] }),
-      canEscalate && onContactSupport && !hasActiveTicket && !resumableTicketId ? /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+      canEscalate && onContactSupport && !hasActiveTicket && !resumableTicketId ? /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
         "button",
         {
           type: "button",
@@ -1316,7 +1379,7 @@ function WidgetMainView({
         }
       ) : null
     ] }),
-    resumableTicketId && onResumeTicket && !hasActiveTicket ? /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
+    resumableTicketId && onResumeTicket && !hasActiveTicket ? /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
       "div",
       {
         style: {
@@ -1330,7 +1393,7 @@ function WidgetMainView({
           borderBottom: `1px solid ${isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)"}`
         },
         children: [
-          /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
             "span",
             {
               style: {
@@ -1345,7 +1408,7 @@ function WidgetMainView({
               ]
             }
           ),
-          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
             "button",
             {
               type: "button",
@@ -1369,7 +1432,7 @@ function WidgetMainView({
         ]
       }
     ) : null,
-    /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
+    /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
       "div",
       {
         style: {
@@ -1381,8 +1444,8 @@ function WidgetMainView({
           overflowY: "auto"
         },
         children: [
-          showWelcomePanel ? /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(WelcomeMessagePanel, { themeSettings, compact: true }) : null,
-          showInlineFaqs ? /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+          showWelcomePanel ? /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(WelcomeMessagePanel, { themeSettings, compact: true }) : null,
+          showInlineFaqs ? /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
             FaqListPanel,
             {
               styles,
@@ -1392,8 +1455,8 @@ function WidgetMainView({
               disabled: interactionLocked,
               compact: true
             }
-          ) : /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(import_jsx_runtime10.Fragment, { children: [
-            hasActiveTicket && hasPreviousConversation ? /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+          ) : /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(import_jsx_runtime11.Fragment, { children: [
+            hasActiveTicket && hasPreviousConversation ? /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
               "div",
               {
                 style: {
@@ -1401,7 +1464,7 @@ function WidgetMainView({
                   justifyContent: "center",
                   padding: "10px 16px 0"
                 },
-                children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+                children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
                   "button",
                   {
                     type: "button",
@@ -1424,7 +1487,7 @@ function WidgetMainView({
                 )
               }
             ) : null,
-            /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
               MessageList,
               {
                 styles: layoutStyles,
@@ -1436,7 +1499,7 @@ function WidgetMainView({
                 hideEmptyPlaceholder: showWelcomePanel
               }
             ),
-            showResolvedActions && ratingSubmitted ? /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+            showResolvedActions && ratingSubmitted ? /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
               "p",
               {
                 style: {
@@ -1448,7 +1511,7 @@ function WidgetMainView({
                 children: "Thanks for your feedback!"
               }
             ) : null,
-            showResolvedActions ? /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
+            showResolvedActions ? /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
               "div",
               {
                 style: {
@@ -1460,7 +1523,7 @@ function WidgetMainView({
                   alignItems: "center"
                 },
                 children: [
-                  !allowResolvedReply && onContinueResolvedConversation ? /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+                  !allowResolvedReply && onContinueResolvedConversation ? /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
                     "button",
                     {
                       type: "button",
@@ -1478,7 +1541,7 @@ function WidgetMainView({
                       children: "Continue this conversation"
                     }
                   ) : null,
-                  onStartNewConversation ? /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+                  onStartNewConversation ? /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
                     "button",
                     {
                       type: "button",
@@ -1500,7 +1563,7 @@ function WidgetMainView({
               }
             ) : null
           ] }),
-          helpOpen && !showInlineFaqs ? /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+          helpOpen && !showInlineFaqs ? /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
             "div",
             {
               style: {
@@ -1512,7 +1575,7 @@ function WidgetMainView({
                 background: isDark ? "#2b2b2b" : "#f8f8f8",
                 boxShadow: isDark ? "0 -4px 24px rgba(0,0,0,0.45)" : "0 -4px 24px rgba(0,0,0,0.08)"
               },
-              children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+              children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
                 FaqListPanel,
                 {
                   styles,
@@ -1528,7 +1591,7 @@ function WidgetMainView({
         ]
       }
     ),
-    /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
+    /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
       "div",
       {
         style: {
@@ -1538,7 +1601,7 @@ function WidgetMainView({
           padding: "10px 16px 0"
         },
         children: [
-          showRatingPrompt && onRatingSubmit && onRatingSkip ? /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+          showRatingPrompt && onRatingSubmit && onRatingSkip ? /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
             ConversationRatingPrompt,
             {
               themeSettings,
@@ -1547,7 +1610,7 @@ function WidgetMainView({
               onSkip: onRatingSkip
             }
           ) : null,
-          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { style: { marginBottom: showComposer && !helpOpen ? 10 : 0 }, children: showHelpChip ? /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { style: { marginBottom: showComposer && !helpOpen ? 10 : 0 }, children: showHelpChip ? /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
             HelpChip,
             {
               active: helpOpen,
@@ -1556,7 +1619,7 @@ function WidgetMainView({
               themeSettings
             }
           ) : null }),
-          showComposer && !helpOpen ? /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+          showComposer && !helpOpen ? /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
             InputArea,
             {
               styles: layoutStyles,
@@ -1566,7 +1629,7 @@ function WidgetMainView({
               loading: Boolean(showTyping || sending || interactionLocked),
               themeSettings
             }
-          ) : helpOpen ? /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { style: { height: 16 }, "aria-hidden": true }) : /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { style: { height: 8 }, "aria-hidden": true })
+          ) : helpOpen ? /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { style: { height: 16 }, "aria-hidden": true }) : /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { style: { height: 8 }, "aria-hidden": true })
         ]
       }
     )
@@ -1574,7 +1637,7 @@ function WidgetMainView({
 }
 
 // src/components/PreChatScreen.tsx
-var import_react4 = require("react");
+var import_react5 = require("react");
 
 // src/lib/email.ts
 function isValidEmail(value) {
@@ -1584,7 +1647,7 @@ var INVALID_EMAIL_MESSAGE = "Please enter a valid email address";
 var REQUIRED_EMAIL_MESSAGE = "Email is required";
 
 // src/components/PreChatScreen.tsx
-var import_jsx_runtime11 = require("react/jsx-runtime");
+var import_jsx_runtime12 = require("react/jsx-runtime");
 function PreChatScreen({
   styles,
   themeSettings,
@@ -1592,16 +1655,16 @@ function PreChatScreen({
   busy,
   error
 }) {
-  const [name, setName] = (0, import_react4.useState)("");
-  const [email, setEmail] = (0, import_react4.useState)("");
-  const [localError, setLocalError] = (0, import_react4.useState)(null);
+  const [name, setName] = (0, import_react5.useState)("");
+  const [email, setEmail] = (0, import_react5.useState)("");
+  const [localError, setLocalError] = (0, import_react5.useState)(null);
   const { headline, subtitle } = splitGreetingMessage(themeSettings.greetingMessage);
   const headerFontSize = themeSettings?.fontSizeBase ?? 28;
   const bodyFontSize = headerFontSize / 2;
   const shownError = localError || error || null;
-  return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { style: styles.welcomeScreen, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { style: styles.welcomeHeader, className: "chat-widget-welcome-header", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { style: { position: "relative", zIndex: 1 }, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { style: styles.welcomeScreen, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { style: styles.welcomeHeader, className: "chat-widget-welcome-header", children: /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { style: { position: "relative", zIndex: 1 }, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
         "h2",
         {
           style: {
@@ -1613,7 +1676,7 @@ function PreChatScreen({
           children: headline
         }
       ),
-      subtitle ? /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+      subtitle ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
         "p",
         {
           style: {
@@ -1624,7 +1687,7 @@ function PreChatScreen({
           },
           children: subtitle
         }
-      ) : /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+      ) : /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
         "p",
         {
           style: {
@@ -1637,7 +1700,7 @@ function PreChatScreen({
         }
       )
     ] }) }),
-    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+    /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
       "div",
       {
         className: "chat-widget-prechat-body",
@@ -1650,7 +1713,7 @@ function PreChatScreen({
           padding: "0 24px 24px",
           boxSizing: "border-box"
         },
-        children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { style: styles.faqContainer, className: "chat-widget-faq-container", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
+        children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { style: styles.faqContainer, className: "chat-widget-faq-container", children: /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
           "form",
           {
             onSubmit: async (e) => {
@@ -1668,9 +1731,9 @@ function PreChatScreen({
               await onContinue({ email: trimmed, name: name.trim() });
             },
             children: [
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { style: { marginBottom: 12 }, children: [
-                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("label", { style: styles.formLabel, children: "Name" }),
-                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+              /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { style: { marginBottom: 12 }, children: [
+                /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("label", { style: styles.formLabel, children: "Name" }),
+                /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
                   "input",
                   {
                     className: "chat-widget-form-input",
@@ -1682,9 +1745,9 @@ function PreChatScreen({
                   }
                 )
               ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { style: { marginBottom: 16 }, children: [
-                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("label", { style: styles.formLabel, children: "Email" }),
-                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+              /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { style: { marginBottom: 16 }, children: [
+                /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("label", { style: styles.formLabel, children: "Email" }),
+                /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
                   "input",
                   {
                     className: "chat-widget-form-input",
@@ -1701,7 +1764,7 @@ function PreChatScreen({
                   }
                 )
               ] }),
-              shownError ? /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+              shownError ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
                 "p",
                 {
                   role: "alert",
@@ -1714,7 +1777,7 @@ function PreChatScreen({
                   children: shownError
                 }
               ) : null,
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { style: { display: "flex", justifyContent: "flex-end" }, children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+              /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { style: { display: "flex", justifyContent: "flex-end" }, children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
                 "button",
                 {
                   type: "submit",
@@ -1736,9 +1799,9 @@ function PreChatScreen({
 }
 
 // src/components/EscalateScreen.tsx
-var import_react5 = require("react");
+var import_react6 = require("react");
 var import_lucide_react7 = require("lucide-react");
-var import_jsx_runtime12 = require("react/jsx-runtime");
+var import_jsx_runtime13 = require("react/jsx-runtime");
 function EscalateScreen({
   styles,
   themeSettings,
@@ -1751,15 +1814,15 @@ function EscalateScreen({
   initialName,
   initialSummary
 }) {
-  const [summary, setSummary] = (0, import_react5.useState)(initialSummary ?? "");
-  const [email, setEmail] = (0, import_react5.useState)(initialEmail ?? "");
-  const [name, setName] = (0, import_react5.useState)(initialName ?? "");
-  const [localError, setLocalError] = (0, import_react5.useState)(null);
+  const [summary, setSummary] = (0, import_react6.useState)(initialSummary ?? "");
+  const [email, setEmail] = (0, import_react6.useState)(initialEmail ?? "");
+  const [name, setName] = (0, import_react6.useState)(initialName ?? "");
+  const [localError, setLocalError] = (0, import_react6.useState)(null);
   const formFontSize = widgetFormFontSize(themeSettings.fontSizeBase);
   const headerSubSize = widgetHeaderSubFontSize(themeSettings.fontSizeBase);
-  return /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { style: styles.chatScreen, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { style: styles.header, children: /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { style: { display: "flex", alignItems: "center", gap: 12 }, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { style: styles.chatScreen, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { style: styles.header, children: /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { style: { display: "flex", alignItems: "center", gap: 12 }, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
         "button",
         {
           type: "button",
@@ -1775,11 +1838,11 @@ function EscalateScreen({
             alignItems: "center",
             justifyContent: "center"
           },
-          children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_lucide_react7.ArrowLeft, { size: 20 })
+          children: /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(import_lucide_react7.ArrowLeft, { size: 20 })
         }
       ),
-      /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+      /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
           "div",
           {
             style: {
@@ -1789,7 +1852,7 @@ function EscalateScreen({
             children: title
           }
         ),
-        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
           "div",
           {
             style: {
@@ -1801,7 +1864,7 @@ function EscalateScreen({
         )
       ] })
     ] }) }),
-    /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
+    /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)(
       "div",
       {
         style: {
@@ -1811,7 +1874,7 @@ function EscalateScreen({
           color: themeSettings?.isDarkMode ? "#f1f5f9" : "#1e293b"
         },
         children: [
-          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
             "p",
             {
               style: {
@@ -1822,10 +1885,10 @@ function EscalateScreen({
               children: "Describe your issue. Our team can continue by email if no agent is available."
             }
           ),
-          collectIdentity ? /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(import_jsx_runtime12.Fragment, { children: [
-            /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { style: { marginBottom: 10 }, children: [
-              /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("label", { style: styles.formLabel, children: "Email" }),
-              /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+          collectIdentity ? /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)(import_jsx_runtime13.Fragment, { children: [
+            /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { style: { marginBottom: 10 }, children: [
+              /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("label", { style: styles.formLabel, children: "Email" }),
+              /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
                 "input",
                 {
                   type: "email",
@@ -1841,9 +1904,9 @@ function EscalateScreen({
                 }
               )
             ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { style: { marginBottom: 12 }, children: [
-              /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("label", { style: styles.formLabel, children: "Name (optional)" }),
-              /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+            /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { style: { marginBottom: 12 }, children: [
+              /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("label", { style: styles.formLabel, children: "Name (optional)" }),
+              /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
                 "input",
                 {
                   value: name,
@@ -1855,7 +1918,7 @@ function EscalateScreen({
               )
             ] })
           ] }) : null,
-          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
             "textarea",
             {
               value: summary,
@@ -1871,7 +1934,7 @@ function EscalateScreen({
               placeholder: "What do you need help with?"
             }
           ),
-          localError ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+          localError ? /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
             "p",
             {
               role: "alert",
@@ -1884,7 +1947,7 @@ function EscalateScreen({
               children: localError
             }
           ) : null,
-          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { style: { marginTop: 16, display: "flex", justifyContent: "flex-end" }, children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { style: { marginTop: 16, display: "flex", justifyContent: "flex-end" }, children: /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
             "button",
             {
               type: "button",
@@ -2441,7 +2504,7 @@ function hasWidgetApiBase(apiBaseUrl) {
 }
 
 // src/ChatWidget.tsx
-var import_jsx_runtime13 = require("react/jsx-runtime");
+var import_jsx_runtime14 = require("react/jsx-runtime");
 function ChatWidget({
   title = "AI Chatbot",
   faqs: faqsProp,
@@ -2456,49 +2519,49 @@ function ChatWidget({
   const hasApi = hasWidgetApiBase(apiBaseUrl);
   const gateDefault = Boolean(hasApi && projectToken?.trim());
   const visitorGateEffective = visitorGate !== void 0 ? visitorGate : gateDefault;
-  const [open, setOpen] = (0, import_react6.useState)(false);
-  const [view, setView] = (0, import_react6.useState)(() => {
+  const [open, setOpen] = (0, import_react7.useState)(false);
+  const [view, setView] = (0, import_react7.useState)(() => {
     if (!visitorGateEffective) return "welcome";
     return "prechat";
   });
-  const [helpOpen, setHelpOpen] = (0, import_react6.useState)(false);
-  const [messages, setMessages] = (0, import_react6.useState)([]);
-  const [text, setText] = (0, import_react6.useState)("");
-  const [awaitingBot, setAwaitingBot] = (0, import_react6.useState)(false);
-  const [sending, setSending] = (0, import_react6.useState)(false);
-  const [visitor, setVisitor] = (0, import_react6.useState)(null);
-  const [prechatBusy, setPrechatBusy] = (0, import_react6.useState)(false);
-  const [prechatError, setPrechatError] = (0, import_react6.useState)(null);
-  const [escalateBusy, setEscalateBusy] = (0, import_react6.useState)(false);
-  const [remoteFaqs, setRemoteFaqs] = (0, import_react6.useState)(null);
-  const [capabilities, setCapabilities] = (0, import_react6.useState)({
+  const [helpOpen, setHelpOpen] = (0, import_react7.useState)(false);
+  const [messages, setMessages] = (0, import_react7.useState)([]);
+  const [text, setText] = (0, import_react7.useState)("");
+  const [awaitingBot, setAwaitingBot] = (0, import_react7.useState)(false);
+  const [sending, setSending] = (0, import_react7.useState)(false);
+  const [visitor, setVisitor] = (0, import_react7.useState)(null);
+  const [prechatBusy, setPrechatBusy] = (0, import_react7.useState)(false);
+  const [prechatError, setPrechatError] = (0, import_react7.useState)(null);
+  const [escalateBusy, setEscalateBusy] = (0, import_react7.useState)(false);
+  const [remoteFaqs, setRemoteFaqs] = (0, import_react7.useState)(null);
+  const [capabilities, setCapabilities] = (0, import_react7.useState)({
     aiChatEnabled: true,
     agentSupportEnabled: true
   });
-  const [ticketSummary, setTicketSummary] = (0, import_react6.useState)(null);
-  const [ratingBusy, setRatingBusy] = (0, import_react6.useState)(false);
-  const [ratingSkipped, setRatingSkipped] = (0, import_react6.useState)(false);
-  const [allowResolvedReply, setAllowResolvedReply] = (0, import_react6.useState)(false);
-  const [widgetUnavailable, setWidgetUnavailable] = (0, import_react6.useState)(null);
-  const [sessionReady, setSessionReady] = (0, import_react6.useState)(!visitorGateEffective);
-  const [inTicketThread, setInTicketThread] = (0, import_react6.useState)(false);
-  const interactionLockRef = (0, import_react6.useRef)(false);
-  const [interactionLocked, setInteractionLocked] = (0, import_react6.useState)(false);
-  const acquireInteractionLock = (0, import_react6.useCallback)(() => {
+  const [ticketSummary, setTicketSummary] = (0, import_react7.useState)(null);
+  const [ratingBusy, setRatingBusy] = (0, import_react7.useState)(false);
+  const [ratingSkipped, setRatingSkipped] = (0, import_react7.useState)(false);
+  const [allowResolvedReply, setAllowResolvedReply] = (0, import_react7.useState)(false);
+  const [widgetUnavailable, setWidgetUnavailable] = (0, import_react7.useState)(null);
+  const [sessionReady, setSessionReady] = (0, import_react7.useState)(!visitorGateEffective);
+  const [inTicketThread, setInTicketThread] = (0, import_react7.useState)(false);
+  const interactionLockRef = (0, import_react7.useRef)(false);
+  const [interactionLocked, setInteractionLocked] = (0, import_react7.useState)(false);
+  const acquireInteractionLock = (0, import_react7.useCallback)(() => {
     if (interactionLockRef.current) return false;
     interactionLockRef.current = true;
     setInteractionLocked(true);
     return true;
   }, []);
-  const releaseInteractionLock = (0, import_react6.useCallback)(() => {
+  const releaseInteractionLock = (0, import_react7.useCallback)(() => {
     interactionLockRef.current = false;
     setInteractionLocked(false);
   }, []);
-  const handleHelpOpenChange = (0, import_react6.useCallback)((open2) => {
+  const handleHelpOpenChange = (0, import_react7.useCallback)((open2) => {
     if (open2 && interactionLockRef.current) return;
     setHelpOpen(open2);
   }, []);
-  const [themeSettings, setThemeSettings] = (0, import_react6.useState)({
+  const [themeSettings, setThemeSettings] = (0, import_react7.useState)({
     isDarkMode: false,
     primaryColor: "#006D77",
     secondaryColor: "#006D7738",
@@ -2506,13 +2569,13 @@ function ChatWidget({
     isGradient: false,
     position: "bottom-right"
   });
-  (0, import_react6.useEffect)(() => {
+  (0, import_react7.useEffect)(() => {
     if (!themeSettingsProp) return;
     setThemeSettings((prev) => ({ ...prev, ...themeSettingsProp }));
   }, [themeSettingsProp]);
-  const themeSettingsPropRef = (0, import_react6.useRef)(themeSettingsProp);
+  const themeSettingsPropRef = (0, import_react7.useRef)(themeSettingsProp);
   themeSettingsPropRef.current = themeSettingsProp;
-  (0, import_react6.useEffect)(() => {
+  (0, import_react7.useEffect)(() => {
     const tok = projectToken?.trim();
     if (!hasApi || apiBase === void 0 || !tok) return;
     let cancelled = false;
@@ -2547,13 +2610,13 @@ function ChatWidget({
       cancelled = true;
     };
   }, [apiBase, hasApi, projectToken]);
-  const faqs = (0, import_react6.useMemo)(() => {
+  const faqs = (0, import_react7.useMemo)(() => {
     if (faqsProp && faqsProp.length > 0) return faqsProp;
     return remoteFaqs ?? [];
   }, [faqsProp, remoteFaqs]);
-  const panelRef = (0, import_react6.useRef)(null);
-  const messagesEndRef = (0, import_react6.useRef)(null);
-  const visitorRef = (0, import_react6.useRef)(visitor);
+  const panelRef = (0, import_react7.useRef)(null);
+  const messagesEndRef = (0, import_react7.useRef)(null);
+  const visitorRef = (0, import_react7.useRef)(visitor);
   visitorRef.current = visitor;
   const hasAiBackend = Boolean(sendMessage);
   const aiChatAvailable = capabilities.aiChatEnabled && hasAiBackend;
@@ -2564,15 +2627,15 @@ function ChatWidget({
     hasApi && projectToken?.trim() && capabilities.agentSupportEnabled && !activeTicketId
   );
   const visitorAccessToken = visitor?.accessToken ?? null;
-  const ticketSyncInFlightRef = (0, import_react6.useRef)(false);
-  const ticketSyncQueuedRef = (0, import_react6.useRef)(false);
-  const ratingSkipStorageKey = (0, import_react6.useCallback)(
+  const ticketSyncInFlightRef = (0, import_react7.useRef)(false);
+  const ticketSyncQueuedRef = (0, import_react7.useRef)(false);
+  const ratingSkipStorageKey = (0, import_react7.useCallback)(
     (ticketId) => {
       return `chat-widget-rating-skipped-${widgetProjectStorageId(projectToken)}-${ticketId}`;
     },
     [projectToken]
   );
-  const syncTicketThread = (0, import_react6.useCallback)(async () => {
+  const syncTicketThread = (0, import_react7.useCallback)(async () => {
     const tid = visitorRef.current?.ticketId;
     const token = visitorRef.current?.accessToken;
     if (apiBase === void 0 || !tid || !token) return;
@@ -2606,7 +2669,7 @@ function ChatWidget({
       }
     }
   }, [apiBase, projectToken]);
-  (0, import_react6.useEffect)(() => {
+  (0, import_react7.useEffect)(() => {
     if (!activeTicketId) {
       setTicketSummary(null);
       setRatingSkipped(false);
@@ -2616,12 +2679,12 @@ function ChatWidget({
     const skipped = typeof window !== "undefined" && sessionStorage.getItem(ratingSkipStorageKey(activeTicketId)) === "1";
     setRatingSkipped(skipped);
   }, [activeTicketId, ratingSkipStorageKey]);
-  (0, import_react6.useEffect)(() => {
+  (0, import_react7.useEffect)(() => {
     if (ticketSummary?.status !== "resolved") {
       setAllowResolvedReply(false);
     }
   }, [ticketSummary?.status]);
-  (0, import_react6.useEffect)(() => {
+  (0, import_react7.useEffect)(() => {
     if (!visitorGateEffective) {
       setSessionReady(true);
       return;
@@ -2695,12 +2758,12 @@ function ChatWidget({
       disconnectVisitorSocket();
     };
   }, [visitorGateEffective, projectToken, apiBase]);
-  (0, import_react6.useEffect)(() => {
+  (0, import_react7.useEffect)(() => {
     if (visitor) {
       saveVisitorSession(visitor, projectToken);
     }
   }, [visitor, projectToken]);
-  (0, import_react6.useEffect)(() => {
+  (0, import_react7.useEffect)(() => {
     if (!sessionReady || !open || view !== "main" || !viewingTicketThread || !visitorAccessToken) return;
     void syncTicketThread();
     const id = window.setInterval(() => {
@@ -2708,7 +2771,7 @@ function ChatWidget({
     }, 12e3);
     return () => window.clearInterval(id);
   }, [sessionReady, open, view, viewingTicketThread, visitorAccessToken, syncTicketThread]);
-  (0, import_react6.useEffect)(() => {
+  (0, import_react7.useEffect)(() => {
     const token = visitorAccessToken;
     if (apiBase === void 0 || !apiBase || !token) return;
     ensureVisitorSocket(apiBase, token);
@@ -2742,11 +2805,11 @@ function ChatWidget({
       unsubTicket();
     };
   }, [apiBase, visitorAccessToken, projectToken, syncTicketThread]);
-  const collectIdentityOnEscalate = (0, import_react6.useMemo)(
+  const collectIdentityOnEscalate = (0, import_react7.useMemo)(
     () => !visitor || !visitor.email,
     [visitor]
   );
-  (0, import_react6.useEffect)(() => {
+  (0, import_react7.useEffect)(() => {
     function onDocClick(e) {
       if (!open) return;
       if (!panelRef.current) return;
@@ -2765,7 +2828,7 @@ function ChatWidget({
     document.addEventListener("mousedown", onDocClick);
     return () => document.removeEventListener("mousedown", onDocClick);
   }, [open, visitorGateEffective]);
-  (0, import_react6.useEffect)(() => {
+  (0, import_react7.useEffect)(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, awaitingBot]);
   const nowTime = () => (/* @__PURE__ */ new Date()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -3326,8 +3389,8 @@ function ChatWidget({
   if (widgetUnavailable && hasApi && projectToken?.trim()) {
     return null;
   }
-  return /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)(import_jsx_runtime13.Fragment, { children: [
-    /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("style", { children: `
+  return /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(import_jsx_runtime14.Fragment, { children: [
+    /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("style", { children: `
         .hide-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .message-row { display:flex; align-items:flex-end; gap:8px; }
@@ -3349,6 +3412,12 @@ function ChatWidget({
           word-break: break-word;
           overflow-wrap: break-word;
           white-space: pre-wrap;
+        }
+        .message-bubble a.chat-message-link {
+          color: inherit;
+          text-decoration: underline;
+          text-underline-offset: 2px;
+          word-break: break-word;
         }
         @keyframes slideInRight { from{ opacity:0; transform:translateX(20px);} to{ opacity:1; transform:translateX(0);} }
         @keyframes slideInLeft  { from{ opacity:0; transform:translateX(-20px);} to{ opacity:1; transform:translateX(0);} }
@@ -3439,7 +3508,7 @@ function ChatWidget({
           }
         }
       ` }),
-    /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
+    /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(
       FloatingButton,
       {
         open,
@@ -3449,7 +3518,7 @@ function ChatWidget({
         className: `chat-widget-floating-btn chat-pos-${positionClass}`
       }
     ),
-    /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)(
+    /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(
       "div",
       {
         ref: panelRef,
@@ -3457,7 +3526,7 @@ function ChatWidget({
         "data-theme": themeSettings.isDarkMode ? "dark" : "light",
         className: `chat-panel chat-pos-${positionClass}`,
         children: [
-          view === "prechat" && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { style: { display: "flex", flexDirection: "column", flex: 1, width: "100%" }, children: /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
+          view === "prechat" && /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { style: { display: "flex", flexDirection: "column", flex: 1, width: "100%" }, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(
             PreChatScreen,
             {
               styles,
@@ -3467,7 +3536,7 @@ function ChatWidget({
               error: prechatError
             }
           ) }),
-          view === "main" && visitorGateEffective ? /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
+          view === "main" && visitorGateEffective ? /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(
             WidgetMainView,
             {
               styles,
@@ -3506,7 +3575,7 @@ function ChatWidget({
               apiBaseUrl: apiBase
             }
           ) : null,
-          view === "welcome" && !visitorGateEffective ? /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
+          view === "welcome" && !visitorGateEffective ? /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(
             WelcomeScreen,
             {
               styles,
@@ -3526,7 +3595,7 @@ function ChatWidget({
               onCreateSupportTicket: () => setView("escalate")
             }
           ) : null,
-          view === "chat" && !visitorGateEffective ? /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
+          view === "chat" && !visitorGateEffective ? /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(
             ChatScreen,
             {
               styles,
@@ -3546,7 +3615,7 @@ function ChatWidget({
               apiBaseUrl: apiBase
             }
           ) : null,
-          view === "escalate" && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
+          view === "escalate" && /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(
             EscalateScreen,
             {
               styles,

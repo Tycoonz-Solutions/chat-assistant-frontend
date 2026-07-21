@@ -1109,6 +1109,12 @@ export default function ChatWidget({
           overflow-wrap: break-word;
           white-space: pre-wrap;
         }
+        .message-bubble a.chat-message-link {
+          color: inherit;
+          text-decoration: underline;
+          text-underline-offset: 2px;
+          word-break: break-word;
+        }
         @keyframes slideInRight { from{ opacity:0; transform:translateX(20px);} to{ opacity:1; transform:translateX(0);} }
         @keyframes slideInLeft  { from{ opacity:0; transform:translateX(-20px);} to{ opacity:1; transform:translateX(0);} }
         @keyframes pulse { 0%,100%{ transform:scale(1); opacity:1;} 50%{ transform:scale(1.1); opacity:0.8;} }

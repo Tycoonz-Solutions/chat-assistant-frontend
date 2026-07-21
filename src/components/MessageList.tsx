@@ -3,6 +3,7 @@ import React from 'react';
 import type { ThemeSettings } from '../../types';
 import { DEFAULT_BOT_AVATAR, resolveWidgetAssetUrl, widgetBotAvatarUrl } from '../lib/widget-display';
 import { widgetBodyFontSize } from '../lib/widget-font-size';
+import LinkifiedText from './LinkifiedText';
 
 export default function MessageList({
   styles,
@@ -80,7 +81,7 @@ export default function MessageList({
                 className="message-bubble"
                 style={isBot ? styles.botMessageBubble : styles.userMessageBubble}
               >
-                {msg.text}
+                <LinkifiedText text={msg.text} />
               </div>
               <div style={{ ...styles.timeText, alignSelf: isBot ? 'flex-start' : 'flex-end' }}>
                 {msg.time ?? nowTime()}
