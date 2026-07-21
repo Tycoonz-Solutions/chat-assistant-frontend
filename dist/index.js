@@ -2764,7 +2764,7 @@ function ChatWidget({
   }, [open, visitorGateEffective]);
   (0, import_react6.useEffect)(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, awaitingBot]);
   const nowTime = () => (/* @__PURE__ */ new Date()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   function matchFaqAnswer(userText) {
     const q = userText.trim().toLowerCase();
