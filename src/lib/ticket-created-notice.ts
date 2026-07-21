@@ -63,7 +63,7 @@ export function buildTicketCreatedNoticeMsg(
     "",
     `Ticket ID: ${idLabel}`,
     "",
-    "Our support team has been notified and will respond during working hours. You will receive an email notification once an agent replies.",
+    "Our support team has been notified and will respond during working hours. You’ll get a confirmation email, and another when an agent replies.",
     "",
     "Estimated Response Time: Within 24 hours.",
   ].join("\n");
@@ -79,14 +79,24 @@ export function buildTicketCreatedNoticeMsg(
   };
 }
 
-/** Append the confirmation when syncing a ticket thread, if marked for this ticket. */
+/** Append the confirmation when syncing a ticket thread, if marked for this ticket.
+ * Hide (and clear) once an agent/staff has replied — the waiting notice is no longer useful.
+ */
 export function withTicketCreatedNotice(
   thread: Msg[],
   projectToken: string | undefined,
   ticketId: string,
   nowTime: () => string,
 ): Msg[] {
-  if (!shouldShowTicketCreatedNotice(projectToken, ticketId)) return thread;
+  const hasStaffReply = thread.some((m) => m.isStaff);
+  if (hasStaffReply) {
+    clearTicketCreatedNotice(projectToken, ticketId);
+    return thread.filter((m) => !m.ticketCreatedNotice);
+  }
+
+  if (!shouldShowTicketCreatedNotice(projectToken, ticketId)) {
+    return thread.filter((m) => !m.ticketCreatedNotice);
+  }
   if (thread.some((m) => m.ticketCreatedNotice)) return thread;
   return [...thread, buildTicketCreatedNoticeMsg(ticketId, nowTime)];
 }

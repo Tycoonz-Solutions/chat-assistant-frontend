@@ -1155,7 +1155,7 @@ function buildTicketCreatedNoticeMsg(ticketId, nowTime) {
     "",
     `Ticket ID: ${idLabel}`,
     "",
-    "Our support team has been notified and will respond during working hours. You will receive an email notification once an agent replies.",
+    "Our support team has been notified and will respond during working hours. You\u2019ll get a confirmation email, and another when an agent replies.",
     "",
     "Estimated Response Time: Within 24 hours."
   ].join("\n");
@@ -1170,7 +1170,14 @@ function buildTicketCreatedNoticeMsg(ticketId, nowTime) {
   };
 }
 function withTicketCreatedNotice(thread, projectToken, ticketId, nowTime) {
-  if (!shouldShowTicketCreatedNotice(projectToken, ticketId)) return thread;
+  const hasStaffReply = thread.some((m) => m.isStaff);
+  if (hasStaffReply) {
+    clearTicketCreatedNotice(projectToken, ticketId);
+    return thread.filter((m) => !m.ticketCreatedNotice);
+  }
+  if (!shouldShowTicketCreatedNotice(projectToken, ticketId)) {
+    return thread.filter((m) => !m.ticketCreatedNotice);
+  }
   if (thread.some((m) => m.ticketCreatedNotice)) return thread;
   return [...thread, buildTicketCreatedNoticeMsg(ticketId, nowTime)];
 }
@@ -3289,6 +3296,9 @@ function ChatWidget({
       if (r.ticketId && r.accessToken) {
         markTicketCreatedNotice(projectToken, String(r.ticketId));
         setInTicketThread(true);
+        setTicketSummary(null);
+        setRatingSkipped(false);
+        setAllowResolvedReply(false);
         await syncTicketThread();
       } else {
         setMessages((m) => [

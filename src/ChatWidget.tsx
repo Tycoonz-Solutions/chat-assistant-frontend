@@ -1054,6 +1054,10 @@ export default function ChatWidget({
       if (r.ticketId && r.accessToken) {
         markTicketCreatedNotice(projectToken, String(r.ticketId));
         setInTicketThread(true);
+        // Drop stale resolved/rating UI from a previous ticket before sync.
+        setTicketSummary(null);
+        setRatingSkipped(false);
+        setAllowResolvedReply(false);
         await syncTicketThread();
       } else {
         setMessages((m) => [
