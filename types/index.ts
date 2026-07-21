@@ -15,6 +15,8 @@ export type Msg = {
   /** Live agent / staff name shown above the message bubble */
   senderName?: string;
   isStaff?: boolean;
+  /** Staff profile photo (`/uploads/...`) when available */
+  senderAvatar?: string | null;
 };
 
 /** Prior turns for multi-turn AI chat (OpenAI roles). */

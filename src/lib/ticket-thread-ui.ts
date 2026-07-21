@@ -40,6 +40,7 @@ export function ticketMessageToWidgetMsg(m: VisitorTicketMessage): Msg {
     text: m.text,
     senderName: parseStaffSenderName(label),
     isStaff: true,
+    senderAvatar: m.senderAvatar ?? null,
     time,
     sortAt,
   };

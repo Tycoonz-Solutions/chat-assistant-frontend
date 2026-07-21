@@ -75,6 +75,10 @@ function parseMessageAttrs(attrs: Record<string, unknown>): VisitorTicketMessage
     senderRole: role === "visitor" || role === "staff" || role === "bot" ? role : "unknown",
     senderLabel:
       typeof attrs.senderLabel === "string" ? attrs.senderLabel : "Support",
+    senderAvatar:
+      typeof attrs.senderAvatar === "string" && attrs.senderAvatar.trim()
+        ? attrs.senderAvatar.trim()
+        : null,
     text: typeof attrs.text === "string" ? attrs.text : "",
     createdAt:
       typeof attrs.createdAt === "string" ? attrs.createdAt : null,
@@ -105,6 +109,10 @@ export function parseSocketTicketMessage(
     senderRole: role === "visitor" || role === "staff" || role === "bot" ? role : "unknown",
     senderLabel:
       typeof payload.senderLabel === "string" ? payload.senderLabel : "Support",
+    senderAvatar:
+      typeof payload.senderAvatar === "string" && payload.senderAvatar.trim()
+        ? payload.senderAvatar.trim()
+        : null,
     text: typeof payload.text === "string" ? payload.text : "",
     createdAt:
       typeof payload.createdAt === "string"

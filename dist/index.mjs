@@ -330,7 +330,7 @@ function MessageList({
   hideEmptyPlaceholder = false
 }) {
   const nowTime = () => (/* @__PURE__ */ new Date()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  const avatarSrc = widgetBotAvatarUrl(apiBaseUrl, themeSettings.botAvatarUrl);
+  const defaultAvatarSrc = widgetBotAvatarUrl(apiBaseUrl, themeSettings.botAvatarUrl);
   return /* @__PURE__ */ jsxs2("div", { style: styles.messagesArea, className: "hide-scrollbar", children: [
     messages.length === 0 && !hideEmptyPlaceholder && /* @__PURE__ */ jsx3("div", { style: {
       textAlign: "center",
@@ -341,6 +341,7 @@ function MessageList({
     messages.map((msg, idx) => {
       const isBot = msg.role === "bot";
       const showStaffName = isBot && msg.isStaff && msg.senderName;
+      const avatarSrc = msg.isStaff && resolveWidgetAssetUrl(apiBaseUrl, msg.senderAvatar) || defaultAvatarSrc;
       return /* @__PURE__ */ jsxs2("div", { className: `message-row ${isBot ? "bot" : "user"}`, children: [
         isBot && /* @__PURE__ */ jsx3("div", { className: "bot-avatar", "aria-hidden": true, children: /* @__PURE__ */ jsx3(
           "img",
@@ -387,7 +388,7 @@ function MessageList({
       alignItems: "center",
       alignSelf: "flex-start"
     }, children: [
-      /* @__PURE__ */ jsx3("div", { className: "bot-avatar", "aria-hidden": true, children: /* @__PURE__ */ jsx3("img", { src: avatarSrc, alt: "" }) }),
+      /* @__PURE__ */ jsx3("div", { className: "bot-avatar", "aria-hidden": true, children: /* @__PURE__ */ jsx3("img", { src: defaultAvatarSrc, alt: "" }) }),
       /* @__PURE__ */ jsxs2("div", { style: {
         background: themeSettings?.isDarkMode ? "#383737ff" : "#d1e7e8",
         padding: "12px 16px",
@@ -1013,6 +1014,7 @@ function ticketMessageToWidgetMsg(m) {
     text: m.text,
     senderName: parseStaffSenderName(label),
     isStaff: true,
+    senderAvatar: m.senderAvatar ?? null,
     time,
     sortAt
   };
@@ -2087,6 +2089,7 @@ function parseTicketMessages(json) {
       id: String(r.id ?? ""),
       senderRole: role === "visitor" || role === "staff" || role === "bot" ? role : "unknown",
       senderLabel: typeof attrs.senderLabel === "string" ? attrs.senderLabel : "Support",
+      senderAvatar: typeof attrs.senderAvatar === "string" && attrs.senderAvatar.trim() ? attrs.senderAvatar.trim() : null,
       text: typeof attrs.text === "string" ? attrs.text : "",
       createdAt: typeof attrs.createdAt === "string" ? attrs.createdAt : null
     };

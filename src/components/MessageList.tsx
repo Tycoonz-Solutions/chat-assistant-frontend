@@ -1,7 +1,7 @@
 // components/chat-widget/components/MessageList.tsx
 import React from 'react';
 import type { ThemeSettings } from '../../types';
-import { DEFAULT_BOT_AVATAR, widgetBotAvatarUrl } from '../lib/widget-display';
+import { DEFAULT_BOT_AVATAR, resolveWidgetAssetUrl, widgetBotAvatarUrl } from '../lib/widget-display';
 import { widgetBodyFontSize } from '../lib/widget-font-size';
 
 export default function MessageList({
@@ -23,7 +23,7 @@ export default function MessageList({
   hideEmptyPlaceholder?: boolean;
 }) {
   const nowTime = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  const avatarSrc = widgetBotAvatarUrl(apiBaseUrl, themeSettings.botAvatarUrl);
+  const defaultAvatarSrc = widgetBotAvatarUrl(apiBaseUrl, themeSettings.botAvatarUrl);
 
   return (
     <div style={styles.messagesArea} className="hide-scrollbar">
@@ -41,6 +41,10 @@ export default function MessageList({
       {messages.map((msg, idx) => {
         const isBot = msg.role === 'bot';
         const showStaffName = isBot && msg.isStaff && msg.senderName;
+        const avatarSrc =
+          (msg.isStaff &&
+            resolveWidgetAssetUrl(apiBaseUrl, msg.senderAvatar)) ||
+          defaultAvatarSrc;
         return (
           <div key={msg.id ?? `local-${idx}`} className={`message-row ${isBot ? 'bot' : 'user'}`}>
             {isBot && (
@@ -94,7 +98,7 @@ export default function MessageList({
           alignSelf: 'flex-start',
         }}>
           <div className="bot-avatar" aria-hidden>
-            <img src={avatarSrc} alt="" />
+            <img src={defaultAvatarSrc} alt="" />
           </div>
           <div style={{
             background: themeSettings?.isDarkMode ? '#383737ff' : '#d1e7e8',

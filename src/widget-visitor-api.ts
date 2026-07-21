@@ -67,6 +67,7 @@ export type VisitorTicketMessage = {
   id: string;
   senderRole: "visitor" | "staff" | "bot" | "unknown";
   senderLabel: string;
+  senderAvatar?: string | null;
   text: string;
   createdAt: string | null;
 };
@@ -84,6 +85,10 @@ function parseTicketMessages(json: Record<string, unknown>): VisitorTicketMessag
         role === "visitor" || role === "staff" || role === "bot" ? role : "unknown",
       senderLabel:
         typeof attrs.senderLabel === "string" ? attrs.senderLabel : "Support",
+      senderAvatar:
+        typeof attrs.senderAvatar === "string" && attrs.senderAvatar.trim()
+          ? attrs.senderAvatar.trim()
+          : null,
       text: typeof attrs.text === "string" ? attrs.text : "",
       createdAt:
         typeof attrs.createdAt === "string" ? attrs.createdAt : null,
