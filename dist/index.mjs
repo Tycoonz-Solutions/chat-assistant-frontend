@@ -1772,12 +1772,14 @@ function EscalateScreen({
   initialName,
   initialSummary
 }) {
+  const [subject, setSubject] = useState4("");
   const [summary, setSummary] = useState4(initialSummary ?? "");
   const [email, setEmail] = useState4(initialEmail ?? "");
   const [name, setName] = useState4(initialName ?? "");
   const [localError, setLocalError] = useState4(null);
   const formFontSize = widgetFormFontSize(themeSettings.fontSizeBase);
   const headerSubSize = widgetHeaderSubFontSize(themeSettings.fontSizeBase);
+  const canSubmit = !busy && subject.trim().length >= 3 && summary.trim().length >= 3 && (!collectIdentity || Boolean(email.trim()));
   return /* @__PURE__ */ jsxs11("div", { style: styles.chatScreen, children: [
     /* @__PURE__ */ jsx13("div", { style: styles.header, children: /* @__PURE__ */ jsxs11("div", { style: { display: "flex", alignItems: "center", gap: 12 }, children: [
       /* @__PURE__ */ jsx13(
@@ -1840,12 +1842,25 @@ function EscalateScreen({
                 fontSize: formFontSize,
                 lineHeight: 1.5
               },
-              children: "Describe your issue. Our team can continue by email if no agent is available."
+              children: collectIdentity ? "Please leave your email address so we can contact you:" : "Describe your issue. Our team can continue by email if no agent is available."
             }
           ),
           collectIdentity ? /* @__PURE__ */ jsxs11(Fragment4, { children: [
             /* @__PURE__ */ jsxs11("div", { style: { marginBottom: 10 }, children: [
-              /* @__PURE__ */ jsx13("label", { style: styles.formLabel, children: "Email" }),
+              /* @__PURE__ */ jsx13("label", { style: styles.formLabel, children: "Name (optional)" }),
+              /* @__PURE__ */ jsx13(
+                "input",
+                {
+                  value: name,
+                  onChange: (e) => setName(e.target.value),
+                  className: "chat-widget-form-input",
+                  style: styles.formInput,
+                  placeholder: "Enter name"
+                }
+              )
+            ] }),
+            /* @__PURE__ */ jsxs11("div", { style: { marginBottom: 10 }, children: [
+              /* @__PURE__ */ jsx13("label", { style: styles.formLabel, children: "Email Address" }),
               /* @__PURE__ */ jsx13(
                 "input",
                 {
@@ -1858,40 +1873,45 @@ function EscalateScreen({
                   },
                   className: "chat-widget-form-input",
                   style: styles.formInput,
-                  placeholder: "you@example.com"
-                }
-              )
-            ] }),
-            /* @__PURE__ */ jsxs11("div", { style: { marginBottom: 12 }, children: [
-              /* @__PURE__ */ jsx13("label", { style: styles.formLabel, children: "Name (optional)" }),
-              /* @__PURE__ */ jsx13(
-                "input",
-                {
-                  value: name,
-                  onChange: (e) => setName(e.target.value),
-                  className: "chat-widget-form-input",
-                  style: styles.formInput,
-                  placeholder: "Your name"
+                  placeholder: "Enter email address"
                 }
               )
             ] })
           ] }) : null,
-          /* @__PURE__ */ jsx13(
-            "textarea",
-            {
-              value: summary,
-              onChange: (e) => setSummary(e.target.value),
-              rows: 6,
-              className: "chat-widget-form-input",
-              style: {
-                ...styles.formTextarea,
-                width: "100%",
-                minHeight: 140,
-                fontSize: formFontSize
-              },
-              placeholder: "What do you need help with?"
-            }
-          ),
+          /* @__PURE__ */ jsxs11("div", { style: { marginBottom: 10 }, children: [
+            /* @__PURE__ */ jsx13("label", { style: styles.formLabel, children: "Subject" }),
+            /* @__PURE__ */ jsx13(
+              "input",
+              {
+                value: subject,
+                onChange: (e) => setSubject(e.target.value),
+                className: "chat-widget-form-input",
+                style: styles.formInput,
+                placeholder: "Enter subject for query",
+                maxLength: 200
+              }
+            )
+          ] }),
+          /* @__PURE__ */ jsxs11("div", { style: { marginBottom: 4 }, children: [
+            /* @__PURE__ */ jsx13("label", { style: styles.formLabel, children: "Query" }),
+            /* @__PURE__ */ jsx13(
+              "textarea",
+              {
+                value: summary,
+                onChange: (e) => setSummary(e.target.value),
+                rows: 5,
+                className: "chat-widget-form-input",
+                style: {
+                  ...styles.formTextarea,
+                  width: "100%",
+                  minHeight: 120,
+                  fontSize: formFontSize
+                },
+                placeholder: "Enter the issue you're facing",
+                maxLength: 5e3
+              }
+            )
+          ] }),
           localError ? /* @__PURE__ */ jsx13(
             "p",
             {
@@ -1909,7 +1929,7 @@ function EscalateScreen({
             "button",
             {
               type: "button",
-              disabled: busy || summary.trim().length < 3 || collectIdentity && !email.trim(),
+              disabled: !canSubmit,
               onClick: async () => {
                 if (collectIdentity) {
                   const trimmed = email.trim();
@@ -1922,15 +1942,24 @@ function EscalateScreen({
                     return;
                   }
                 }
+                if (subject.trim().length < 3) {
+                  setLocalError("Please enter a subject (at least 3 characters).");
+                  return;
+                }
+                if (summary.trim().length < 3) {
+                  setLocalError("Please describe your issue (at least 3 characters).");
+                  return;
+                }
                 setLocalError(null);
                 await onSubmit({
+                  subject: subject.trim(),
                   summary: summary.trim(),
                   ...collectIdentity ? { email: email.trim(), name: name.trim() || void 0 } : {}
                 });
               },
               style: {
                 ...styles.sendPill,
-                opacity: busy || summary.trim().length < 3 || collectIdentity && !email.trim() ? 0.6 : 1
+                opacity: canSubmit ? 1 : 0.6
               },
               children: busy ? "Sending\u2026" : "Send request"
             }
@@ -2257,6 +2286,7 @@ async function postVisitorEscalate(apiBaseUrl, body) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       email: body.email.trim(),
+      subject: body.subject.trim(),
       message: body.message.trim(),
       token: body.projectToken,
       ...body.name?.trim() ? { name: body.name.trim() } : {},
@@ -3302,6 +3332,7 @@ function ChatWidget({
         email,
         name: payload.name ?? visitor?.name,
         projectToken: tok,
+        subject: payload.subject,
         message: payload.summary,
         ...transcript.length ? { transcript } : {}
       });

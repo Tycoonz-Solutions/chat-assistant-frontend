@@ -85,6 +85,7 @@ declare function postVisitorEscalate(apiBaseUrl: string, body: {
     email: string;
     name?: string;
     projectToken: string;
+    subject: string;
     message: string;
     transcript?: EscalateTranscriptTurn[];
 }): Promise<VisitorApiResult>;

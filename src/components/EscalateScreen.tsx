@@ -9,6 +9,7 @@ import {
 } from "../lib/email";
 
 export type EscalatePayload = {
+  subject: string;
   summary: string;
   email?: string;
   name?: string;
@@ -37,12 +38,19 @@ export default function EscalateScreen({
   initialName?: string;
   initialSummary?: string;
 }) {
+  const [subject, setSubject] = useState("");
   const [summary, setSummary] = useState(initialSummary ?? "");
   const [email, setEmail] = useState(initialEmail ?? "");
   const [name, setName] = useState(initialName ?? "");
   const [localError, setLocalError] = useState<string | null>(null);
   const formFontSize = widgetFormFontSize(themeSettings.fontSizeBase);
   const headerSubSize = widgetHeaderSubFontSize(themeSettings.fontSizeBase);
+
+  const canSubmit =
+    !busy &&
+    subject.trim().length >= 3 &&
+    summary.trim().length >= 3 &&
+    (!collectIdentity || Boolean(email.trim()));
 
   return (
     <div style={styles.chatScreen}>
@@ -103,12 +111,24 @@ export default function EscalateScreen({
             lineHeight: 1.5,
           }}
         >
-          Describe your issue. Our team can continue by email if no agent is available.
+          {collectIdentity
+            ? "Please leave your email address so we can contact you:"
+            : "Describe your issue. Our team can continue by email if no agent is available."}
         </p>
         {collectIdentity ? (
           <>
             <div style={{ marginBottom: 10 }}>
-              <label style={styles.formLabel as React.CSSProperties}>Email</label>
+              <label style={styles.formLabel as React.CSSProperties}>Name (optional)</label>
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="chat-widget-form-input"
+                style={styles.formInput as React.CSSProperties}
+                placeholder="Enter name"
+              />
+            </div>
+            <div style={{ marginBottom: 10 }}>
+              <label style={styles.formLabel as React.CSSProperties}>Email Address</label>
               <input
                 type="email"
                 required
@@ -119,34 +139,39 @@ export default function EscalateScreen({
                 }}
                 className="chat-widget-form-input"
                 style={styles.formInput as React.CSSProperties}
-                placeholder="you@example.com"
-              />
-            </div>
-            <div style={{ marginBottom: 12 }}>
-              <label style={styles.formLabel as React.CSSProperties}>Name (optional)</label>
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="chat-widget-form-input"
-                style={styles.formInput as React.CSSProperties}
-                placeholder="Your name"
+                placeholder="Enter email address"
               />
             </div>
           </>
         ) : null}
-        <textarea
-          value={summary}
-          onChange={(e) => setSummary(e.target.value)}
-          rows={6}
-          className="chat-widget-form-input"
-          style={{
-            ...(styles.formTextarea as React.CSSProperties),
-            width: "100%",
-            minHeight: 140,
-            fontSize: formFontSize,
-          }}
-          placeholder="What do you need help with?"
-        />
+        <div style={{ marginBottom: 10 }}>
+          <label style={styles.formLabel as React.CSSProperties}>Subject</label>
+          <input
+            value={subject}
+            onChange={(e) => setSubject(e.target.value)}
+            className="chat-widget-form-input"
+            style={styles.formInput as React.CSSProperties}
+            placeholder="Enter subject for query"
+            maxLength={200}
+          />
+        </div>
+        <div style={{ marginBottom: 4 }}>
+          <label style={styles.formLabel as React.CSSProperties}>Query</label>
+          <textarea
+            value={summary}
+            onChange={(e) => setSummary(e.target.value)}
+            rows={5}
+            className="chat-widget-form-input"
+            style={{
+              ...(styles.formTextarea as React.CSSProperties),
+              width: "100%",
+              minHeight: 120,
+              fontSize: formFontSize,
+            }}
+            placeholder="Enter the issue you're facing"
+            maxLength={5000}
+          />
+        </div>
         {localError ? (
           <p
             role="alert"
@@ -163,11 +188,7 @@ export default function EscalateScreen({
         <div style={{ marginTop: 16, display: "flex", justifyContent: "flex-end" }}>
           <button
             type="button"
-            disabled={
-              busy ||
-              summary.trim().length < 3 ||
-              (collectIdentity && !email.trim())
-            }
+            disabled={!canSubmit}
             onClick={async () => {
               if (collectIdentity) {
                 const trimmed = email.trim();
@@ -180,8 +201,17 @@ export default function EscalateScreen({
                   return;
                 }
               }
+              if (subject.trim().length < 3) {
+                setLocalError("Please enter a subject (at least 3 characters).");
+                return;
+              }
+              if (summary.trim().length < 3) {
+                setLocalError("Please describe your issue (at least 3 characters).");
+                return;
+              }
               setLocalError(null);
               await onSubmit({
+                subject: subject.trim(),
                 summary: summary.trim(),
                 ...(collectIdentity
                   ? { email: email.trim(), name: name.trim() || undefined }
@@ -190,10 +220,7 @@ export default function EscalateScreen({
             }}
             style={{
               ...(styles.sendPill as React.CSSProperties),
-              opacity:
-                busy || summary.trim().length < 3 || (collectIdentity && !email.trim())
-                  ? 0.6
-                  : 1,
+              opacity: canSubmit ? 1 : 0.6,
             }}
           >
             {busy ? "Sending…" : "Send request"}

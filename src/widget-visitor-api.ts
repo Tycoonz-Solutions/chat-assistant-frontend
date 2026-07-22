@@ -243,6 +243,7 @@ export async function postVisitorEscalate(
     email: string;
     name?: string;
     projectToken: string;
+    subject: string;
     message: string;
     transcript?: EscalateTranscriptTurn[];
   }
@@ -254,6 +255,7 @@ export async function postVisitorEscalate(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       email: body.email.trim(),
+      subject: body.subject.trim(),
       message: body.message.trim(),
       token: body.projectToken,
       ...(body.name?.trim() ? { name: body.name.trim() } : {}),

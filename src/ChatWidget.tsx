@@ -1036,6 +1036,7 @@ export default function ChatWidget({
         email,
         name: payload.name ?? visitor?.name,
         projectToken: tok,
+        subject: payload.subject,
         message: payload.summary,
         ...(transcript.length ? { transcript } : {}),
       });
