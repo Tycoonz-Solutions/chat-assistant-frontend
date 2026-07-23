@@ -1340,7 +1340,7 @@ function WidgetMainView({
             children: title
           }
         ),
-        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+        hasActiveTicket || !showWelcomePanel ? /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
           "div",
           {
             style: {
@@ -1355,7 +1355,7 @@ function WidgetMainView({
               ticketResolved ? "resolved" : ticketStatus
             )}` : subtitle || headline
           }
-        )
+        ) : null
       ] }),
       canEscalate && onContactSupport && !hasActiveTicket && !resumableTicketId ? /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
         "button",

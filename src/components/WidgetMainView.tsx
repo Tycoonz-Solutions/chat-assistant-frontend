@@ -169,24 +169,26 @@ export default function WidgetMainView({
           >
             {title}
           </div>
-          <div
-            style={{
-              fontSize: headerSubSize,
-              opacity: 0.9,
-              marginTop: 2,
-              lineHeight: 1.4,
-            }}
-          >
-            {hasActiveTicket && activeTicketId
-              ? `Ticket ${formatTicketId(activeTicketId)} · Status: ${formatVisitorTicketStatus(
-                  ticketResolved ? "resolved" : ticketStatus,
-                )}`
-              : hasActiveTicket
-                ? `Status: ${formatVisitorTicketStatus(
+          {hasActiveTicket || !showWelcomePanel ? (
+            <div
+              style={{
+                fontSize: headerSubSize,
+                opacity: 0.9,
+                marginTop: 2,
+                lineHeight: 1.4,
+              }}
+            >
+              {hasActiveTicket && activeTicketId
+                ? `Ticket ${formatTicketId(activeTicketId)} · Status: ${formatVisitorTicketStatus(
                     ticketResolved ? "resolved" : ticketStatus,
                   )}`
-                : subtitle || headline}
-          </div>
+                : hasActiveTicket
+                  ? `Status: ${formatVisitorTicketStatus(
+                      ticketResolved ? "resolved" : ticketStatus,
+                    )}`
+                  : subtitle || headline}
+            </div>
+          ) : null}
         </div>
         {canEscalate && onContactSupport && !hasActiveTicket && !resumableTicketId ? (
           <button

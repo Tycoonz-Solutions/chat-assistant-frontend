@@ -1298,7 +1298,7 @@ function WidgetMainView({
             children: title
           }
         ),
-        /* @__PURE__ */ jsx11(
+        hasActiveTicket || !showWelcomePanel ? /* @__PURE__ */ jsx11(
           "div",
           {
             style: {
@@ -1313,7 +1313,7 @@ function WidgetMainView({
               ticketResolved ? "resolved" : ticketStatus
             )}` : subtitle || headline
           }
-        )
+        ) : null
       ] }),
       canEscalate && onContactSupport && !hasActiveTicket && !resumableTicketId ? /* @__PURE__ */ jsx11(
         "button",
