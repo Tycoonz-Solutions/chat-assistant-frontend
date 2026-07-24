@@ -2,7 +2,7 @@
 import React from "react";
 import { List, ChevronRight, Send, type LucideIcon } from "lucide-react";
 import type { FAQ, ThemeSettings } from "../../types/index";
-import { splitGreetingMessage } from "../lib/greeting-message";
+import { resolveWelcomeCopy } from "../lib/greeting-message";
 
 export default function WelcomeScreen({
   styles,
@@ -29,7 +29,7 @@ export default function WelcomeScreen({
   canEscalate?: boolean;
   onCreateSupportTicket?: () => void;
 }) {
-  const { headline, subtitle } = splitGreetingMessage(themeSettings.greetingMessage);
+  const { headline, subtitle } = resolveWelcomeCopy(themeSettings);
   return (
     <div style={styles.welcomeScreen}>
       <div style={styles.welcomeHeader} className="chat-widget-welcome-header">
@@ -38,7 +38,7 @@ export default function WelcomeScreen({
             {headline}
           </h2>
           {subtitle ? (
-            <p style={{ margin: 0, fontSize: themeSettings?.fontSizeBase / 2, opacity: 0.95, lineHeight: 1.5 }}>
+            <p style={{ margin: 0, fontSize: themeSettings?.fontSizeBase / 2, opacity: 0.95, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
               {subtitle}
             </p>
           ) : null}

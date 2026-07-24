@@ -6,14 +6,14 @@ export type EscalateTranscriptTurn = {
   at?: string;
 };
 
-/** Build AI chat history to persist when the visitor escalates to a ticket. */
+/** Build FAQ + AI chat history to persist when the visitor escalates to a ticket. */
 export function buildEscalateTranscript(messages: Msg[]): EscalateTranscriptTurn[] {
   return messages
     .filter(
       (m) =>
-        !m.faqLocal &&
         !m.ticketCreatedNotice &&
         !m.isStaff &&
+        !m.isSystem &&
         (m.role === "user" || m.role === "bot") &&
         m.text.trim().length > 0,
     )
@@ -24,7 +24,7 @@ export function buildEscalateTranscript(messages: Msg[]): EscalateTranscriptTurn
     }));
 }
 
-/** Prefill escalate summary from the latest visitor message in the AI thread. */
+/** Prefill escalate summary from the latest visitor message in the AI/FAQ thread. */
 export function lastUserMessageForEscalate(messages: Msg[]): string {
   for (let i = messages.length - 1; i >= 0; i -= 1) {
     const m = messages[i];

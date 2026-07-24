@@ -65,7 +65,7 @@ export async function postVisitorIdentify(
 
 export type VisitorTicketMessage = {
   id: string;
-  senderRole: "visitor" | "staff" | "bot" | "unknown";
+  senderRole: "visitor" | "staff" | "bot" | "system" | "unknown";
   senderLabel: string;
   senderAvatar?: string | null;
   text: string;
@@ -82,7 +82,12 @@ function parseTicketMessages(json: Record<string, unknown>): VisitorTicketMessag
     return {
       id: String(r.id ?? ""),
       senderRole:
-        role === "visitor" || role === "staff" || role === "bot" ? role : "unknown",
+        role === "visitor" ||
+        role === "staff" ||
+        role === "bot" ||
+        role === "system"
+          ? role
+          : "unknown",
       senderLabel:
         typeof attrs.senderLabel === "string" ? attrs.senderLabel : "Support",
       senderAvatar:

@@ -1,6 +1,6 @@
 import React from "react";
 import type { ThemeSettings } from "../../types";
-import { splitGreetingMessage } from "../lib/greeting-message";
+import { resolveWelcomeCopy } from "../lib/greeting-message";
 import {
   widgetBodyFontSize,
   widgetWelcomeHeadlineSize,
@@ -13,7 +13,7 @@ export default function WelcomeMessagePanel({
   themeSettings: ThemeSettings;
   compact?: boolean;
 }) {
-  const { headline, subtitle } = splitGreetingMessage(themeSettings.greetingMessage);
+  const { headline, subtitle } = resolveWelcomeCopy(themeSettings);
   const headlineSize = widgetWelcomeHeadlineSize(themeSettings.fontSizeBase);
   const bodySize = widgetBodyFontSize(themeSettings.fontSizeBase);
   const isDark = themeSettings.isDarkMode;
@@ -50,6 +50,7 @@ export default function WelcomeMessagePanel({
             fontSize: bodySize,
             lineHeight: 1.5,
             opacity: 0.95,
+            whiteSpace: "pre-wrap",
           }}
         >
           {subtitle}

@@ -7,9 +7,11 @@ export type Msg = {
   id?: string;
   /** ISO timestamp for ordering merged ticket + FAQ messages */
   sortAt?: string;
-  /** FAQ quick-help row (not sent to agent ticket) */
+  /** FAQ quick-help row (persisted on escalate with the rest of the thread) */
   faqLocal?: boolean;
   faqForQuestion?: string;
+  /** System divider (e.g. handoff to live agent) */
+  isSystem?: boolean;
   /** Local confirmation after escalate (widget-only, not sent to agent) */
   ticketCreatedNotice?: boolean;
   /** Live agent / staff name shown above the message bubble */

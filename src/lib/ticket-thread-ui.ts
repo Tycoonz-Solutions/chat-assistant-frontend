@@ -17,6 +17,16 @@ function formatTime(iso: string | null): string {
 export function ticketMessageToWidgetMsg(m: VisitorTicketMessage): Msg {
   const sortAt = m.createdAt ?? new Date().toISOString();
   const time = formatTime(m.createdAt);
+  if (m.senderRole === "system") {
+    return {
+      id: m.id,
+      role: "bot",
+      text: m.text,
+      time,
+      sortAt,
+      isSystem: true,
+    };
+  }
   if (m.senderRole === "visitor") {
     return { id: m.id, role: "user", text: m.text, time, sortAt };
   }
@@ -73,6 +83,7 @@ function compareMsgs(a: Msg, b: Msg): number {
   const ta = a.sortAt ?? "";
   const tb = b.sortAt ?? "";
   if (ta !== tb) return ta.localeCompare(tb);
+  if (a.isSystem !== b.isSystem) return a.isSystem ? -1 : 1;
   if (a.role !== b.role) return a.role === "user" ? -1 : 1;
   return 0;
 }
@@ -85,29 +96,3 @@ export function buildVisitorThread(
   const faqMsgs = faqExchanges.flatMap(faqExchangeToMsgs);
   return [...ticketMsgs, ...faqMsgs].sort(compareMsgs);
 }
-
-function isAiBotMessage(m: Msg): boolean {
-  return m.role === "bot" && !m.isStaff && !m.faqLocal && !m.ticketCreatedNotice;
-}
-
-/**
- * Split a ticket thread so the widget can hide pre-ticket AI chat behind
- * "Show previous conversation", while always showing the ticket query + later replies.
- */
-export function splitTicketThreadHistory(messages: Msg[]): {
-  previous: Msg[];
-  current: Msg[];
-} {
-  let lastAiIdx = -1;
-  for (let i = 0; i < messages.length; i += 1) {
-    if (isAiBotMessage(messages[i])) lastAiIdx = i;
-  }
-  if (lastAiIdx < 0) {
-    return { previous: [], current: messages };
-  }
-  return {
-    previous: messages.slice(0, lastAiIdx + 1),
-    current: messages.slice(lastAiIdx + 1),
-  };
-}
-

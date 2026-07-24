@@ -1,6 +1,7 @@
 // components/chat-widget/components/LoginForm.tsx
 import React from 'react';
 import { ThemeSettings } from '../../types';
+import { resolveWelcomeCopy } from '../lib/greeting-message';
 
 export default function LoginForm({
   styles,
@@ -25,15 +26,16 @@ export default function LoginForm({
   onSubmit: (e?: React.FormEvent) => void;
   themeSettings: ThemeSettings;
 }) {
+  const { headline, subtitle } = resolveWelcomeCopy(themeSettings, { preChat: true });
   return (
     <div style={styles.welcomeScreen}>
       <div style={styles.welcomeHeader}>
         <div style={{ position: 'relative', zIndex: 1 }}>
           <h2 style={{ margin: 0, fontSize: themeSettings?.fontSizeBase ? themeSettings?.fontSizeBase : 28, fontWeight: 700, marginBottom: 8 }}>
-            Hi there!
+            {headline}
           </h2>
-          <p style={{ margin: 0, fontSize: themeSettings?.fontSizeBase ? themeSettings?.fontSizeBase / 2 : 14, opacity: 0.95, lineHeight: 1.5 }}>
-            AI chat powered by our team - how can we assist you today?
+          <p style={{ margin: 0, fontSize: themeSettings?.fontSizeBase ? themeSettings?.fontSizeBase / 2 : 14, opacity: 0.95, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
+            {subtitle}
           </p>
         </div>
       </div>

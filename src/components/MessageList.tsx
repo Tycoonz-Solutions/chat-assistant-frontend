@@ -40,6 +40,40 @@ export default function MessageList({
       )}
 
       {messages.map((msg, idx) => {
+        if (msg.isSystem) {
+          return (
+            <div
+              key={msg.id ?? `system-${idx}`}
+              style={{
+                display: "flex",
+                justifyContent: "center",
+                padding: "12px 16px",
+              }}
+            >
+              <div
+                style={{
+                  maxWidth: "92%",
+                  textAlign: "center",
+                  fontSize: widgetBodyFontSize(themeSettings?.fontSizeBase),
+                  fontWeight: 600,
+                  lineHeight: 1.4,
+                  color: themeSettings?.isDarkMode ? "#e2e8f0" : "#0f766e",
+                  background: themeSettings?.isDarkMode
+                    ? "rgba(13, 148, 136, 0.22)"
+                    : "rgba(0, 109, 119, 0.12)",
+                  border: themeSettings?.isDarkMode
+                    ? "1px solid rgba(45, 212, 191, 0.35)"
+                    : "1px solid rgba(0, 109, 119, 0.25)",
+                  borderRadius: 8,
+                  padding: "8px 14px",
+                }}
+              >
+                {msg.text}
+              </div>
+            </div>
+          );
+        }
+
         const isBot = msg.role === 'bot';
         const showStaffName = isBot && msg.isStaff && msg.senderName;
         const avatarSrc =

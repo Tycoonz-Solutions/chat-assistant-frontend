@@ -8,6 +8,10 @@ type Props = {
   onSkip: () => void;
 };
 
+/**
+ * Elevated white card — matches the floating “Made in Bolt” badge look
+ * (white surface, soft shadow, dark type) so it reads clearly on dark widgets.
+ */
 export default function ConversationRatingPrompt({
   themeSettings,
   busy,
@@ -17,7 +21,6 @@ export default function ConversationRatingPrompt({
   const [hovered, setHovered] = useState(0);
   const [selected, setSelected] = useState(0);
   const primary = themeSettings.primaryColor ?? "#006D77";
-  const isDark = themeSettings.isDarkMode;
 
   async function handleSubmit() {
     if (!selected || busy) return;
@@ -27,35 +30,38 @@ export default function ConversationRatingPrompt({
   return (
     <div
       style={{
-        margin: "12px 16px 0",
-        padding: "14px 16px",
-        borderRadius: 12,
-        border: `1px solid ${isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.08)"}`,
-        background: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,109,119,0.06)",
+        margin: "4px 0 12px",
+        padding: "16px 18px",
+        borderRadius: 20,
+        background: "#ffffff",
+        border: "1px solid rgba(0,0,0,0.06)",
+        boxShadow: "0 4px 18px rgba(0,0,0,0.14), 0 1px 3px rgba(0,0,0,0.08)",
       }}
     >
       <p
         style={{
           margin: "0 0 4px",
           fontSize: 14,
-          fontWeight: 600,
-          color: isDark ? "#fff" : "#1a1a1a",
+          fontWeight: 700,
+          color: "#111827",
+          letterSpacing: "-0.01em",
         }}
       >
         How was your conversation?
       </p>
       <p
         style={{
-          margin: "0 0 12px",
+          margin: "0 0 14px",
           fontSize: 12,
-          color: isDark ? "rgba(255,255,255,0.72)" : "#6b7280",
+          lineHeight: 1.4,
+          color: "#6b7280",
         }}
       >
         Rate your experience after this chat has ended.
       </p>
 
       <div
-        style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 12 }}
+        style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 14 }}
         role="radiogroup"
         aria-label="Rate your conversation from 1 to 5 stars"
       >
@@ -78,7 +84,7 @@ export default function ConversationRatingPrompt({
                 fontSize: 28,
                 lineHeight: 1,
                 padding: 0,
-                color: active ? "#f59e0b" : isDark ? "#4b5563" : "#d1d5db",
+                color: active ? "#f59e0b" : "#d1d5db",
                 transition: "color 0.12s ease",
               }}
             >
@@ -88,7 +94,7 @@ export default function ConversationRatingPrompt({
         })}
       </div>
 
-      <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+      <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", alignItems: "center" }}>
         <button
           type="button"
           onClick={onSkip}
@@ -96,10 +102,11 @@ export default function ConversationRatingPrompt({
           style={{
             border: "none",
             background: "transparent",
-            color: isDark ? "rgba(255,255,255,0.7)" : "#6b7280",
+            color: "#6b7280",
             fontSize: 13,
+            fontWeight: 500,
             cursor: busy ? "not-allowed" : "pointer",
-            padding: "6px 10px",
+            padding: "8px 12px",
           }}
         >
           Skip
@@ -110,14 +117,15 @@ export default function ConversationRatingPrompt({
           disabled={!selected || busy}
           style={{
             border: "none",
-            borderRadius: 20,
-            padding: "8px 16px",
+            borderRadius: 999,
+            padding: "8px 18px",
             fontSize: 13,
             fontWeight: 600,
             color: "#fff",
             background: primary,
             opacity: !selected || busy ? 0.55 : 1,
             cursor: !selected || busy ? "not-allowed" : "pointer",
+            boxShadow: !selected || busy ? "none" : "0 2px 8px rgba(0,0,0,0.18)",
           }}
         >
           {busy ? "Submitting…" : "Submit"}

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import type { ThemeSettings } from "../../types/index";
-import { splitGreetingMessage } from "../lib/greeting-message";
+import { resolveWelcomeCopy } from "../lib/greeting-message";
 import {
   INVALID_EMAIL_MESSAGE,
   REQUIRED_EMAIL_MESSAGE,
@@ -23,7 +23,7 @@ export default function PreChatScreen({
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
-  const { headline, subtitle } = splitGreetingMessage(themeSettings.greetingMessage);
+  const { headline, subtitle } = resolveWelcomeCopy(themeSettings, { preChat: true });
   const headerFontSize = themeSettings?.fontSizeBase ?? 28;
   const bodyFontSize = headerFontSize / 2;
   const shownError = localError || error || null;
@@ -49,22 +49,12 @@ export default function PreChatScreen({
                 fontSize: bodyFontSize,
                 opacity: 0.95,
                 lineHeight: 1.5,
+                whiteSpace: "pre-wrap",
               }}
             >
               {subtitle}
             </p>
-          ) : (
-            <p
-              style={{
-                margin: 0,
-                fontSize: bodyFontSize,
-                opacity: 0.95,
-                lineHeight: 1.5,
-              }}
-            >
-              Tell us who you are so we can help and follow up by email if needed.
-            </p>
-          )}
+          ) : null}
         </div>
       </div>
 

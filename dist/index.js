@@ -78,12 +78,42 @@ var import_react = __toESM(require("react"));
 var import_lucide_react2 = require("lucide-react");
 
 // src/lib/greeting-message.ts
-var DEFAULT_GREETING = "Hi there!\nAI chat powered by our team - how can we assist you today?";
+var DEFAULT_GREETING_BODY = "AI chat powered by our team \u2014 how can we assist you today?";
+var DEFAULT_PRECHAT_BODY = "Tell us who you are so we can help and follow up by email if needed.";
+var DISCARDED_HEADLINES = [
+  /^at your service!?$/i,
+  /^hi there!?$/i,
+  /^hello!?$/i
+];
+function isDiscardedHeadline(line) {
+  return DISCARDED_HEADLINES.some((re) => re.test(line.trim()));
+}
 function splitGreetingMessage(raw) {
-  const t = (raw ?? "").trim() || DEFAULT_GREETING;
+  const t = (raw ?? "").trim();
+  if (!t) return { headline: "", subtitle: "" };
   const idx = t.indexOf("\n");
   if (idx === -1) return { headline: t, subtitle: "" };
   return { headline: t.slice(0, idx).trim(), subtitle: t.slice(idx + 1).trim() };
+}
+function resolveBotName(themeSettings) {
+  return themeSettings.botName?.trim() || "AI Chatbot";
+}
+function resolveWelcomeCopy(themeSettings, options) {
+  const botName = resolveBotName(themeSettings);
+  const headline = `Welcome! I'm ${botName}`;
+  const { headline: first, subtitle: rest } = splitGreetingMessage(
+    themeSettings.greetingMessage
+  );
+  let subtitle = "";
+  if (rest) {
+    subtitle = rest;
+  } else if (first && !isDiscardedHeadline(first)) {
+    subtitle = first;
+  }
+  if (!subtitle) {
+    subtitle = options?.preChat ? DEFAULT_PRECHAT_BODY : DEFAULT_GREETING_BODY;
+  }
+  return { headline, subtitle };
 }
 
 // src/components/WelcomeScreen.tsx
@@ -101,11 +131,11 @@ function WelcomeScreen({
   onCreateSupportTicket,
   interactionLocked = false
 }) {
-  const { headline, subtitle } = splitGreetingMessage(themeSettings.greetingMessage);
+  const { headline, subtitle } = resolveWelcomeCopy(themeSettings);
   return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { style: styles.welcomeScreen, children: [
     /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: styles.welcomeHeader, className: "chat-widget-welcome-header", children: /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { style: { position: "relative", zIndex: 1 }, children: [
       /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("h2", { style: { margin: 0, fontSize: themeSettings?.fontSizeBase, fontWeight: 700, marginBottom: 8 }, children: headline }),
-      subtitle ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("p", { style: { margin: 0, fontSize: themeSettings?.fontSizeBase / 2, opacity: 0.95, lineHeight: 1.5 }, children: subtitle }) : null
+      subtitle ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("p", { style: { margin: 0, fontSize: themeSettings?.fontSizeBase / 2, opacity: 0.95, lineHeight: 1.5, whiteSpace: "pre-wrap" }, children: subtitle }) : null
     ] }) }),
     canEscalate && onCreateSupportTicket ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
       "div",
@@ -444,6 +474,37 @@ function MessageList({
       padding: "40px 20px"
     }, children: "Start a conversation..." }),
     messages.map((msg, idx) => {
+      if (msg.isSystem) {
+        return /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+          "div",
+          {
+            style: {
+              display: "flex",
+              justifyContent: "center",
+              padding: "12px 16px"
+            },
+            children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+              "div",
+              {
+                style: {
+                  maxWidth: "92%",
+                  textAlign: "center",
+                  fontSize: widgetBodyFontSize(themeSettings?.fontSizeBase),
+                  fontWeight: 600,
+                  lineHeight: 1.4,
+                  color: themeSettings?.isDarkMode ? "#e2e8f0" : "#0f766e",
+                  background: themeSettings?.isDarkMode ? "rgba(13, 148, 136, 0.22)" : "rgba(0, 109, 119, 0.12)",
+                  border: themeSettings?.isDarkMode ? "1px solid rgba(45, 212, 191, 0.35)" : "1px solid rgba(0, 109, 119, 0.25)",
+                  borderRadius: 8,
+                  padding: "8px 14px"
+                },
+                children: msg.text
+              }
+            )
+          },
+          msg.id ?? `system-${idx}`
+        );
+      }
       const isBot = msg.role === "bot";
       const showStaffName = isBot && msg.isStaff && msg.senderName;
       const avatarSrc = msg.isStaff && resolveWidgetAssetUrl(apiBaseUrl, msg.senderAvatar) || defaultAvatarSrc;
@@ -532,8 +593,10 @@ function MessageList({
 }
 
 // src/components/InputArea.tsx
+var import_react3 = require("react");
 var import_lucide_react3 = require("lucide-react");
 var import_jsx_runtime5 = require("react/jsx-runtime");
+var MAX_INPUT_HEIGHT_PX = 120;
 function InputArea({
   styles,
   text,
@@ -542,48 +605,90 @@ function InputArea({
   loading,
   themeSettings
 }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { style: styles.inputArea, children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("form", { onSubmit: (e) => {
-    e.preventDefault();
-    onSend(e);
-  }, children: /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { style: styles.inputWrapper, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
-      "input",
-      {
-        value: text,
-        onChange: (e) => setText(e.target.value),
-        placeholder: "Type message here...",
-        className: "chat-widget-input",
-        style: styles.input,
-        disabled: loading
-      }
-    ),
-    /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(
-      "button",
-      {
-        type: "submit",
-        disabled: loading || !text.trim(),
-        style: {
-          ...styles.sendButton,
-          opacity: loading || !text.trim() ? 0.5 : 1,
-          cursor: loading || !text.trim() ? "not-allowed" : "pointer"
-        },
-        onMouseEnter: (e) => {
-          if (!loading && text.trim()) {
-            e.currentTarget.style.transform = "scale(1.1)";
-            e.currentTarget.style.background = themeSettings?.isGradient ? `linear-gradient(90deg, ${themeSettings.primaryColor}, ${themeSettings.secondaryColor})` : themeSettings.primaryColor;
-          }
-        },
-        onMouseLeave: (e) => {
-          e.currentTarget.style.transform = "scale(1)";
-          e.currentTarget.style.background = themeSettings?.isGradient ? `linear-gradient(90deg, ${themeSettings.primaryColor}, ${themeSettings.secondaryColor})` : themeSettings.primaryColor;
-        },
-        children: [
-          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(import_lucide_react3.Send, { size: 18 }),
-          " Send"
-        ]
-      }
-    )
-  ] }) }) });
+  const textareaRef = (0, import_react3.useRef)(null);
+  (0, import_react3.useEffect)(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, MAX_INPUT_HEIGHT_PX)}px`;
+  }, [text]);
+  return /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { style: styles.inputArea, children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+    "form",
+    {
+      onSubmit: (e) => {
+        e.preventDefault();
+        onSend(e);
+      },
+      children: /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(
+        "div",
+        {
+          style: {
+            ...styles.inputWrapper,
+            alignItems: "flex-end"
+          },
+          children: [
+            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+              "textarea",
+              {
+                ref: textareaRef,
+                value: text,
+                onChange: (e) => setText(e.target.value),
+                onKeyDown: (e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    if (!loading && text.trim()) void onSend(e);
+                  }
+                },
+                placeholder: "Type message here...",
+                className: "chat-widget-input",
+                rows: 1,
+                disabled: loading,
+                style: {
+                  ...styles.input,
+                  width: "auto",
+                  minWidth: 0,
+                  resize: "none",
+                  overflowY: "auto",
+                  overflowX: "hidden",
+                  whiteSpace: "pre-wrap",
+                  overflowWrap: "anywhere",
+                  wordBreak: "break-word",
+                  lineHeight: 1.4,
+                  maxHeight: MAX_INPUT_HEIGHT_PX
+                }
+              }
+            ),
+            /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(
+              "button",
+              {
+                type: "submit",
+                disabled: loading || !text.trim(),
+                style: {
+                  ...styles.sendButton,
+                  opacity: loading || !text.trim() ? 0.5 : 1,
+                  cursor: loading || !text.trim() ? "not-allowed" : "pointer"
+                },
+                onMouseEnter: (e) => {
+                  if (!loading && text.trim()) {
+                    e.currentTarget.style.transform = "scale(1.1)";
+                    e.currentTarget.style.background = themeSettings?.isGradient ? `linear-gradient(90deg, ${themeSettings.primaryColor}, ${themeSettings.secondaryColor})` : themeSettings.primaryColor;
+                  }
+                },
+                onMouseLeave: (e) => {
+                  e.currentTarget.style.transform = "scale(1)";
+                  e.currentTarget.style.background = themeSettings?.isGradient ? `linear-gradient(90deg, ${themeSettings.primaryColor}, ${themeSettings.secondaryColor})` : themeSettings.primaryColor;
+                },
+                children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(import_lucide_react3.Send, { size: 18 }),
+                  " Send"
+                ]
+              }
+            )
+          ]
+        }
+      )
+    }
+  ) });
 }
 
 // src/components/ChatScreen.tsx
@@ -733,9 +838,6 @@ function ChatScreen({
     )
   ] });
 }
-
-// src/components/WidgetMainView.tsx
-var import_react4 = require("react");
 
 // src/components/FaqListPanel.tsx
 var import_lucide_react5 = require("lucide-react");
@@ -899,7 +1001,7 @@ function HelpChip({ active, onClick, themeSettings, disabled = false }) {
 }
 
 // src/components/ConversationRatingPrompt.tsx
-var import_react3 = require("react");
+var import_react4 = require("react");
 var import_jsx_runtime9 = require("react/jsx-runtime");
 function ConversationRatingPrompt({
   themeSettings,
@@ -907,10 +1009,9 @@ function ConversationRatingPrompt({
   onSubmit,
   onSkip
 }) {
-  const [hovered, setHovered] = (0, import_react3.useState)(0);
-  const [selected, setSelected] = (0, import_react3.useState)(0);
+  const [hovered, setHovered] = (0, import_react4.useState)(0);
+  const [selected, setSelected] = (0, import_react4.useState)(0);
   const primary = themeSettings.primaryColor ?? "#006D77";
-  const isDark = themeSettings.isDarkMode;
   async function handleSubmit() {
     if (!selected || busy) return;
     await onSubmit(selected);
@@ -919,11 +1020,12 @@ function ConversationRatingPrompt({
     "div",
     {
       style: {
-        margin: "12px 16px 0",
-        padding: "14px 16px",
-        borderRadius: 12,
-        border: `1px solid ${isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.08)"}`,
-        background: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,109,119,0.06)"
+        margin: "4px 0 12px",
+        padding: "16px 18px",
+        borderRadius: 20,
+        background: "#ffffff",
+        border: "1px solid rgba(0,0,0,0.06)",
+        boxShadow: "0 4px 18px rgba(0,0,0,0.14), 0 1px 3px rgba(0,0,0,0.08)"
       },
       children: [
         /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
@@ -932,8 +1034,9 @@ function ConversationRatingPrompt({
             style: {
               margin: "0 0 4px",
               fontSize: 14,
-              fontWeight: 600,
-              color: isDark ? "#fff" : "#1a1a1a"
+              fontWeight: 700,
+              color: "#111827",
+              letterSpacing: "-0.01em"
             },
             children: "How was your conversation?"
           }
@@ -942,9 +1045,10 @@ function ConversationRatingPrompt({
           "p",
           {
             style: {
-              margin: "0 0 12px",
+              margin: "0 0 14px",
               fontSize: 12,
-              color: isDark ? "rgba(255,255,255,0.72)" : "#6b7280"
+              lineHeight: 1.4,
+              color: "#6b7280"
             },
             children: "Rate your experience after this chat has ended."
           }
@@ -952,7 +1056,7 @@ function ConversationRatingPrompt({
         /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
           "div",
           {
-            style: { display: "flex", alignItems: "center", gap: 6, marginBottom: 12 },
+            style: { display: "flex", alignItems: "center", gap: 6, marginBottom: 14 },
             role: "radiogroup",
             "aria-label": "Rate your conversation from 1 to 5 stars",
             children: [1, 2, 3, 4, 5].map((star) => {
@@ -974,7 +1078,7 @@ function ConversationRatingPrompt({
                     fontSize: 28,
                     lineHeight: 1,
                     padding: 0,
-                    color: active ? "#f59e0b" : isDark ? "#4b5563" : "#d1d5db",
+                    color: active ? "#f59e0b" : "#d1d5db",
                     transition: "color 0.12s ease"
                   },
                   children: "\u2605"
@@ -984,7 +1088,7 @@ function ConversationRatingPrompt({
             })
           }
         ),
-        /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { style: { display: "flex", gap: 8, justifyContent: "flex-end" }, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { style: { display: "flex", gap: 8, justifyContent: "flex-end", alignItems: "center" }, children: [
           /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
             "button",
             {
@@ -994,10 +1098,11 @@ function ConversationRatingPrompt({
               style: {
                 border: "none",
                 background: "transparent",
-                color: isDark ? "rgba(255,255,255,0.7)" : "#6b7280",
+                color: "#6b7280",
                 fontSize: 13,
+                fontWeight: 500,
                 cursor: busy ? "not-allowed" : "pointer",
-                padding: "6px 10px"
+                padding: "8px 12px"
               },
               children: "Skip"
             }
@@ -1010,14 +1115,15 @@ function ConversationRatingPrompt({
               disabled: !selected || busy,
               style: {
                 border: "none",
-                borderRadius: 20,
-                padding: "8px 16px",
+                borderRadius: 999,
+                padding: "8px 18px",
                 fontSize: 13,
                 fontWeight: 600,
                 color: "#fff",
                 background: primary,
                 opacity: !selected || busy ? 0.55 : 1,
-                cursor: !selected || busy ? "not-allowed" : "pointer"
+                cursor: !selected || busy ? "not-allowed" : "pointer",
+                boxShadow: !selected || busy ? "none" : "0 2px 8px rgba(0,0,0,0.18)"
               },
               children: busy ? "Submitting\u2026" : "Submit"
             }
@@ -1040,7 +1146,7 @@ function WelcomeMessagePanel({
   themeSettings,
   compact = false
 }) {
-  const { headline, subtitle } = splitGreetingMessage(themeSettings.greetingMessage);
+  const { headline, subtitle } = resolveWelcomeCopy(themeSettings);
   const headlineSize = widgetWelcomeHeadlineSize(themeSettings.fontSizeBase);
   const bodySize = widgetBodyFontSize(themeSettings.fontSizeBase);
   const isDark = themeSettings.isDarkMode;
@@ -1075,7 +1181,8 @@ function WelcomeMessagePanel({
               margin: 0,
               fontSize: bodySize,
               lineHeight: 1.5,
-              opacity: 0.95
+              opacity: 0.95,
+              whiteSpace: "pre-wrap"
             },
             children: subtitle
           }
@@ -1083,95 +1190,6 @@ function WelcomeMessagePanel({
       ]
     }
   );
-}
-
-// src/lib/ticket-thread-ui.ts
-function formatTime(iso) {
-  if (!iso) {
-    return (/* @__PURE__ */ new Date()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  }
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) {
-    return (/* @__PURE__ */ new Date()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  }
-  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-}
-function ticketMessageToWidgetMsg(m) {
-  const sortAt = m.createdAt ?? (/* @__PURE__ */ new Date()).toISOString();
-  const time = formatTime(m.createdAt);
-  if (m.senderRole === "visitor") {
-    return { id: m.id, role: "user", text: m.text, time, sortAt };
-  }
-  if (m.senderRole === "bot") {
-    return {
-      id: m.id,
-      role: "bot",
-      text: m.text,
-      senderName: m.senderLabel || "AI Assistant",
-      time,
-      sortAt
-    };
-  }
-  const label = m.senderLabel && m.senderLabel !== "Unknown sender" && m.senderLabel !== "System" ? m.senderLabel : "Support";
-  return {
-    id: m.id,
-    role: "bot",
-    text: m.text,
-    senderName: parseStaffSenderName(label),
-    isStaff: true,
-    senderAvatar: m.senderAvatar ?? null,
-    time,
-    sortAt
-  };
-}
-function faqExchangeToMsgs(exchange) {
-  const base = Date.parse(exchange.askedAt) || Date.now();
-  const qAt = new Date(base).toISOString();
-  const aAt = new Date(base + 1).toISOString();
-  return [
-    {
-      role: "user",
-      text: exchange.question,
-      time: formatTime(qAt),
-      sortAt: qAt,
-      faqLocal: true
-    },
-    {
-      role: "bot",
-      text: exchange.answer,
-      time: formatTime(aAt),
-      sortAt: aAt,
-      faqLocal: true,
-      faqForQuestion: exchange.question
-    }
-  ];
-}
-function compareMsgs(a, b) {
-  const ta = a.sortAt ?? "";
-  const tb = b.sortAt ?? "";
-  if (ta !== tb) return ta.localeCompare(tb);
-  if (a.role !== b.role) return a.role === "user" ? -1 : 1;
-  return 0;
-}
-function buildVisitorThread(ticketMsgs, faqExchanges) {
-  const faqMsgs = faqExchanges.flatMap(faqExchangeToMsgs);
-  return [...ticketMsgs, ...faqMsgs].sort(compareMsgs);
-}
-function isAiBotMessage(m) {
-  return m.role === "bot" && !m.isStaff && !m.faqLocal && !m.ticketCreatedNotice;
-}
-function splitTicketThreadHistory(messages) {
-  let lastAiIdx = -1;
-  for (let i = 0; i < messages.length; i += 1) {
-    if (isAiBotMessage(messages[i])) lastAiIdx = i;
-  }
-  if (lastAiIdx < 0) {
-    return { previous: [], current: messages };
-  }
-  return {
-    previous: messages.slice(0, lastAiIdx + 1),
-    current: messages.slice(lastAiIdx + 1)
-  };
 }
 
 // src/lib/widget-storage-id.ts
@@ -1249,13 +1267,6 @@ function withTicketCreatedNotice(thread, projectToken, ticketId, nowTime) {
 
 // src/components/WidgetMainView.tsx
 var import_jsx_runtime11 = require("react/jsx-runtime");
-var DEFAULT_GREETING2 = "Hi there!\nHow can we help you today?";
-function splitGreeting(raw) {
-  const t = (raw ?? "").trim() || DEFAULT_GREETING2;
-  const idx = t.indexOf("\n");
-  if (idx === -1) return { headline: t, subtitle: "" };
-  return { headline: t.slice(0, idx).trim(), subtitle: t.slice(idx + 1).trim() };
-}
 function WidgetMainView({
   styles,
   title,
@@ -1292,7 +1303,7 @@ function WidgetMainView({
   placeholder,
   apiBaseUrl
 }) {
-  const { headline, subtitle } = splitGreeting(themeSettings.greetingMessage);
+  const { headline, subtitle } = resolveWelcomeCopy(themeSettings);
   const feedbackComplete = ratingSubmitted || !showRatingPrompt;
   const showResolvedActions = ticketResolved && feedbackComplete && hasActiveTicket;
   const showComposer = (!ticketResolved || allowResolvedReply) && (hasActiveTicket || messages.some((m) => m.role === "user") || aiChatAvailable);
@@ -1301,17 +1312,6 @@ function WidgetMainView({
   const showWelcomePanel = !hasActiveTicket && messages.length === 0 && !ticketResolved;
   const isDark = themeSettings.isDarkMode;
   const headerSubSize = widgetHeaderSubFontSize(themeSettings.fontSizeBase);
-  const bodyFontSize = widgetBodyFontSize(themeSettings.fontSizeBase);
-  const [showPreviousConversation, setShowPreviousConversation] = (0, import_react4.useState)(false);
-  (0, import_react4.useEffect)(() => {
-    setShowPreviousConversation(false);
-  }, [activeTicketId]);
-  const { previous: previousMessages, current: currentMessages } = (0, import_react4.useMemo)(
-    () => hasActiveTicket ? splitTicketThreadHistory(messages) : { previous: [], current: messages },
-    [hasActiveTicket, messages]
-  );
-  const hasPreviousConversation = previousMessages.length > 0;
-  const displayMessages = hasActiveTicket && hasPreviousConversation && !showPreviousConversation ? currentMessages : messages;
   const layoutStyles = {
     ...styles,
     messagesArea: {
@@ -1456,42 +1456,11 @@ function WidgetMainView({
               compact: true
             }
           ) : /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(import_jsx_runtime11.Fragment, { children: [
-            hasActiveTicket && hasPreviousConversation ? /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
-              "div",
-              {
-                style: {
-                  display: "flex",
-                  justifyContent: "center",
-                  padding: "10px 16px 0"
-                },
-                children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
-                  "button",
-                  {
-                    type: "button",
-                    onClick: () => setShowPreviousConversation((v) => !v),
-                    style: {
-                      background: "none",
-                      border: "none",
-                      padding: 0,
-                      margin: 0,
-                      cursor: "pointer",
-                      fontSize: bodyFontSize,
-                      fontWeight: 500,
-                      lineHeight: 1.4,
-                      color: themeSettings.primaryColor ?? "#006D77",
-                      textDecoration: "underline",
-                      textUnderlineOffset: 3
-                    },
-                    children: showPreviousConversation ? "Hide previous conversation" : "Show previous conversation"
-                  }
-                )
-              }
-            ) : null,
             /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
               MessageList,
               {
                 styles: layoutStyles,
-                messages: displayMessages,
+                messages,
                 showTyping,
                 messagesEndRef,
                 themeSettings,
@@ -1658,7 +1627,7 @@ function PreChatScreen({
   const [name, setName] = (0, import_react5.useState)("");
   const [email, setEmail] = (0, import_react5.useState)("");
   const [localError, setLocalError] = (0, import_react5.useState)(null);
-  const { headline, subtitle } = splitGreetingMessage(themeSettings.greetingMessage);
+  const { headline, subtitle } = resolveWelcomeCopy(themeSettings, { preChat: true });
   const headerFontSize = themeSettings?.fontSizeBase ?? 28;
   const bodyFontSize = headerFontSize / 2;
   const shownError = localError || error || null;
@@ -1683,22 +1652,12 @@ function PreChatScreen({
             margin: 0,
             fontSize: bodyFontSize,
             opacity: 0.95,
-            lineHeight: 1.5
+            lineHeight: 1.5,
+            whiteSpace: "pre-wrap"
           },
           children: subtitle
         }
-      ) : /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-        "p",
-        {
-          style: {
-            margin: 0,
-            fontSize: bodyFontSize,
-            opacity: 0.95,
-            lineHeight: 1.5
-          },
-          children: "Tell us who you are so we can help and follow up by email if needed."
-        }
-      )
+      ) : null
     ] }) }),
     /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
       "div",
@@ -2015,7 +1974,7 @@ function EscalateScreen({
 // src/lib/build-escalate-transcript.ts
 function buildEscalateTranscript(messages) {
   return messages.filter(
-    (m) => !m.faqLocal && !m.ticketCreatedNotice && !m.isStaff && (m.role === "user" || m.role === "bot") && m.text.trim().length > 0
+    (m) => !m.ticketCreatedNotice && !m.isStaff && !m.isSystem && (m.role === "user" || m.role === "bot") && m.text.trim().length > 0
   ).map((m) => ({
     role: m.role === "user" ? "user" : "assistant",
     content: m.text.trim(),
@@ -2221,7 +2180,7 @@ function parseTicketMessages(json) {
     const role = attrs.senderRole;
     return {
       id: String(r.id ?? ""),
-      senderRole: role === "visitor" || role === "staff" || role === "bot" ? role : "unknown",
+      senderRole: role === "visitor" || role === "staff" || role === "bot" || role === "system" ? role : "unknown",
       senderLabel: typeof attrs.senderLabel === "string" ? attrs.senderLabel : "Support",
       senderAvatar: typeof attrs.senderAvatar === "string" && attrs.senderAvatar.trim() ? attrs.senderAvatar.trim() : null,
       text: typeof attrs.text === "string" ? attrs.text : "",
@@ -2340,6 +2299,90 @@ async function postVisitorEscalate(apiBaseUrl, body) {
     throw new Error(apiErrorMessage(json, `Escalate failed (${res.status})`));
   }
   return readEnvelope(json);
+}
+
+// src/lib/ticket-thread-ui.ts
+function formatTime(iso) {
+  if (!iso) {
+    return (/* @__PURE__ */ new Date()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  }
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) {
+    return (/* @__PURE__ */ new Date()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  }
+  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+function ticketMessageToWidgetMsg(m) {
+  const sortAt = m.createdAt ?? (/* @__PURE__ */ new Date()).toISOString();
+  const time = formatTime(m.createdAt);
+  if (m.senderRole === "system") {
+    return {
+      id: m.id,
+      role: "bot",
+      text: m.text,
+      time,
+      sortAt,
+      isSystem: true
+    };
+  }
+  if (m.senderRole === "visitor") {
+    return { id: m.id, role: "user", text: m.text, time, sortAt };
+  }
+  if (m.senderRole === "bot") {
+    return {
+      id: m.id,
+      role: "bot",
+      text: m.text,
+      senderName: m.senderLabel || "AI Assistant",
+      time,
+      sortAt
+    };
+  }
+  const label = m.senderLabel && m.senderLabel !== "Unknown sender" && m.senderLabel !== "System" ? m.senderLabel : "Support";
+  return {
+    id: m.id,
+    role: "bot",
+    text: m.text,
+    senderName: parseStaffSenderName(label),
+    isStaff: true,
+    senderAvatar: m.senderAvatar ?? null,
+    time,
+    sortAt
+  };
+}
+function faqExchangeToMsgs(exchange) {
+  const base = Date.parse(exchange.askedAt) || Date.now();
+  const qAt = new Date(base).toISOString();
+  const aAt = new Date(base + 1).toISOString();
+  return [
+    {
+      role: "user",
+      text: exchange.question,
+      time: formatTime(qAt),
+      sortAt: qAt,
+      faqLocal: true
+    },
+    {
+      role: "bot",
+      text: exchange.answer,
+      time: formatTime(aAt),
+      sortAt: aAt,
+      faqLocal: true,
+      faqForQuestion: exchange.question
+    }
+  ];
+}
+function compareMsgs(a, b) {
+  const ta = a.sortAt ?? "";
+  const tb = b.sortAt ?? "";
+  if (ta !== tb) return ta.localeCompare(tb);
+  if (a.isSystem !== b.isSystem) return a.isSystem ? -1 : 1;
+  if (a.role !== b.role) return a.role === "user" ? -1 : 1;
+  return 0;
+}
+function buildVisitorThread(ticketMsgs, faqExchanges) {
+  const faqMsgs = faqExchanges.flatMap(faqExchangeToMsgs);
+  return [...ticketMsgs, ...faqMsgs].sort(compareMsgs);
 }
 
 // src/lib/faq-transcript.ts
@@ -2521,6 +2564,11 @@ function isTicketDismissed(projectToken, ticketId) {
 function dismissTicket(projectToken, ticketId) {
   const ids = readSet(projectToken);
   ids.add(String(ticketId));
+  writeSet(projectToken, ids);
+}
+function clearDismissedTicket(projectToken, ticketId) {
+  const ids = readSet(projectToken);
+  ids.delete(String(ticketId));
   writeSet(projectToken, ids);
 }
 
@@ -2761,7 +2809,24 @@ function ChatWidget({
             ticketId: r.ticketId ?? null
           };
           if (profile.ticketId && isTicketDismissed(projectToken, profile.ticketId)) {
-            profile.ticketId = null;
+            if (apiBase !== void 0 && profile.accessToken) {
+              try {
+                const summary = await getVisitorTicket(
+                  apiBase,
+                  profile.ticketId,
+                  profile.accessToken
+                );
+                if (summary.canRate) {
+                  clearDismissedTicket(projectToken, profile.ticketId);
+                } else {
+                  profile.ticketId = null;
+                }
+              } catch {
+                profile.ticketId = null;
+              }
+            } else {
+              profile.ticketId = null;
+            }
           }
         } catch {
           profile = {
@@ -2780,6 +2845,22 @@ function ChatWidget({
       setMessages([]);
       setView("main");
       setHelpOpen(false);
+      if (apiBase !== void 0 && profile.ticketId && profile.accessToken) {
+        try {
+          const summary = await getVisitorTicket(
+            apiBase,
+            profile.ticketId,
+            profile.accessToken
+          );
+          if (cancelled) return;
+          setTicketSummary(summary);
+          if (summary.canRate) {
+            setRatingSkipped(false);
+            setInTicketThread(true);
+          }
+        } catch {
+        }
+      }
       setSessionReady(true);
     }
     void hydrateVisitorSession();
@@ -2802,6 +2883,60 @@ function ChatWidget({
     return () => window.clearInterval(id);
   }, [sessionReady, open, view, viewingTicketThread, visitorAccessToken, syncTicketThread]);
   (0, import_react7.useEffect)(() => {
+    if (!sessionReady || !open || !visitorGateEffective) return;
+    if (viewingTicketThread) return;
+    const email = visitorRef.current?.email;
+    const tok = projectToken?.trim();
+    if (apiBase === void 0 || !email || !tok) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await postVisitorIdentify(apiBase, {
+          email,
+          name: visitorRef.current?.name || void 0,
+          projectToken: tok
+        });
+        if (cancelled || !r.ticketId || !r.accessToken) return;
+        let ticketId = String(r.ticketId);
+        if (isTicketDismissed(projectToken, ticketId)) {
+          const summary2 = await getVisitorTicket(apiBase, ticketId, r.accessToken);
+          if (!summary2.canRate) return;
+          clearDismissedTicket(projectToken, ticketId);
+        }
+        const summary = await getVisitorTicket(apiBase, ticketId, r.accessToken);
+        if (cancelled || !summary.canRate) return;
+        const current = visitorRef.current;
+        if (!current) return;
+        const next = {
+          ...current,
+          email: r.email ?? current.email,
+          name: r.name ?? current.name,
+          accessToken: r.accessToken,
+          ticketId
+        };
+        visitorRef.current = next;
+        setVisitor(next);
+        saveVisitorSession(next, projectToken);
+        setTicketSummary(summary);
+        setRatingSkipped(false);
+        setInTicketThread(true);
+        setHelpOpen(false);
+        setView("main");
+      } catch {
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    sessionReady,
+    open,
+    viewingTicketThread,
+    visitorGateEffective,
+    apiBase,
+    projectToken
+  ]);
+  (0, import_react7.useEffect)(() => {
     const token = visitorAccessToken;
     if (apiBase === void 0 || !apiBase || !token) return;
     ensureVisitorSocket(apiBase, token);
@@ -2812,22 +2947,38 @@ function ChatWidget({
       void syncTicketThread();
     });
     const unsubTicket = subscribeVisitorSocket("ticket-updated", (payload) => {
-      const tid = visitorRef.current?.ticketId;
-      if (!tid || String(payload.ticketId ?? "") !== tid) return;
+      const payloadTid = payload.ticketId != null ? String(payload.ticketId) : "";
+      if (!payloadTid) return;
       const summary = visitorTicketSummaryFromSocket(payload);
-      if (summary) {
-        setTicketSummary(summary);
-        if (summary.status === "resolved") {
-          setAllowResolvedReply(false);
-          if (summary.canRate) {
-            setRatingSkipped(false);
-            if (typeof window !== "undefined") {
-              sessionStorage.removeItem(ratingSkipStorageKey(tid));
-            }
-          }
-        }
-      } else {
+      if (!summary) {
         void syncTicketThread();
+        return;
+      }
+      const localTid = visitorRef.current?.ticketId ? String(visitorRef.current.ticketId) : null;
+      if (localTid && localTid !== payloadTid && !summary.canRate) return;
+      if (summary.canRate || !localTid || localTid === payloadTid) {
+        const current = visitorRef.current;
+        if (current && current.ticketId !== payloadTid) {
+          const next = { ...current, ticketId: payloadTid };
+          visitorRef.current = next;
+          setVisitor(next);
+          saveVisitorSession(next, projectToken);
+        }
+        clearDismissedTicket(projectToken, payloadTid);
+      }
+      setTicketSummary(summary);
+      if (summary.status === "resolved") {
+        setAllowResolvedReply(false);
+        if (summary.canRate) {
+          setRatingSkipped(false);
+          if (typeof window !== "undefined") {
+            sessionStorage.removeItem(ratingSkipStorageKey(payloadTid));
+          }
+          setInTicketThread(true);
+          setHelpOpen(false);
+          setView("main");
+          void syncTicketThread();
+        }
       }
     });
     return () => {

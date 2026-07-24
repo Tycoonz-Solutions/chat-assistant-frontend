@@ -353,11 +353,30 @@ export default function ChatWidget({
       setVisitor(profile);
       visitorRef.current = profile;
       saveVisitorSession(profile, projectToken);
-      // Always land on FAQ / AI home; resume open tickets via banner.
+      // Land on FAQ / AI home unless this ticket still needs a rating.
       setInTicketThread(false);
       setMessages([]);
       setView("main");
       setHelpOpen(false);
+
+      if (apiBase !== undefined && profile.ticketId && profile.accessToken) {
+        try {
+          const summary = await getVisitorTicket(
+            apiBase,
+            profile.ticketId,
+            profile.accessToken,
+          );
+          if (cancelled) return;
+          setTicketSummary(summary);
+          if (summary.canRate) {
+            setRatingSkipped(false);
+            setInTicketThread(true);
+          }
+        } catch {
+          // Keep home view if ticket lookup fails.
+        }
+      }
+
       setSessionReady(true);
     }
 
@@ -412,6 +431,12 @@ export default function ChatWidget({
             if (typeof window !== "undefined") {
               sessionStorage.removeItem(ratingSkipStorageKey(tid));
             }
+            // Rating UI only renders inside the ticket thread — open it when the
+            // agent resolves so the visitor actually sees the feedback prompt.
+            setInTicketThread(true);
+            setHelpOpen(false);
+            setView("main");
+            void syncTicketThread();
           }
         }
       } else {

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React from "react";
 import MessageList from "./MessageList";
 import InputArea from "./InputArea";
 import FaqListPanel from "./FaqListPanel";
@@ -8,20 +8,10 @@ import type { FAQ, Msg, ThemeSettings } from "../../types";
 import { formatTicketId } from "../lib/formatTicketId";
 import WelcomeMessagePanel from "./WelcomeMessagePanel";
 import {
-  widgetBodyFontSize,
   widgetHeaderSubFontSize,
 } from "../lib/widget-font-size";
-import { splitTicketThreadHistory } from "../lib/ticket-thread-ui";
 import { formatVisitorTicketStatus } from "../lib/ticket-created-notice";
-
-const DEFAULT_GREETING = "Hi there!\nHow can we help you today?";
-
-function splitGreeting(raw: string | undefined): { headline: string; subtitle: string } {
-  const t = (raw ?? "").trim() || DEFAULT_GREETING;
-  const idx = t.indexOf("\n");
-  if (idx === -1) return { headline: t, subtitle: "" };
-  return { headline: t.slice(0, idx).trim(), subtitle: t.slice(idx + 1).trim() };
-}
+import { resolveWelcomeCopy } from "../lib/greeting-message";
 
 type Props = {
   styles: Record<string, React.CSSProperties>;
@@ -98,7 +88,7 @@ export default function WidgetMainView({
   placeholder,
   apiBaseUrl,
 }: Props) {
-  const { headline, subtitle } = splitGreeting(themeSettings.greetingMessage);
+  const { headline, subtitle } = resolveWelcomeCopy(themeSettings);
   const feedbackComplete = ratingSubmitted || !showRatingPrompt;
   const showResolvedActions =
     ticketResolved && feedbackComplete && hasActiveTicket;
@@ -116,27 +106,6 @@ export default function WidgetMainView({
     !hasActiveTicket && messages.length === 0 && !ticketResolved;
   const isDark = themeSettings.isDarkMode;
   const headerSubSize = widgetHeaderSubFontSize(themeSettings.fontSizeBase);
-  const bodyFontSize = widgetBodyFontSize(themeSettings.fontSizeBase);
-
-  const [showPreviousConversation, setShowPreviousConversation] = useState(false);
-
-  useEffect(() => {
-    setShowPreviousConversation(false);
-  }, [activeTicketId]);
-
-  const { previous: previousMessages, current: currentMessages } = useMemo(
-    () =>
-      hasActiveTicket
-        ? splitTicketThreadHistory(messages)
-        : { previous: [] as Msg[], current: messages },
-    [hasActiveTicket, messages],
-  );
-
-  const hasPreviousConversation = previousMessages.length > 0;
-  const displayMessages =
-    hasActiveTicket && hasPreviousConversation && !showPreviousConversation
-      ? currentMessages
-      : messages;
 
   /** Input uses position:absolute globally; override so the help chip is not covered. */
   const layoutStyles = {
@@ -282,40 +251,9 @@ export default function WidgetMainView({
           />
         ) : (
           <>
-            {hasActiveTicket && hasPreviousConversation ? (
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "center",
-                  padding: "10px 16px 0",
-                }}
-              >
-                <button
-                  type="button"
-                  onClick={() => setShowPreviousConversation((v) => !v)}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    padding: 0,
-                    margin: 0,
-                    cursor: "pointer",
-                    fontSize: bodyFontSize,
-                    fontWeight: 500,
-                    lineHeight: 1.4,
-                    color: themeSettings.primaryColor ?? "#006D77",
-                    textDecoration: "underline",
-                    textUnderlineOffset: 3,
-                  }}
-                >
-                  {showPreviousConversation
-                    ? "Hide previous conversation"
-                    : "Show previous conversation"}
-                </button>
-              </div>
-            ) : null}
             <MessageList
               styles={layoutStyles as never}
-              messages={displayMessages as never[]}
+              messages={messages as never[]}
               showTyping={showTyping}
               messagesEndRef={messagesEndRef}
               themeSettings={themeSettings}
