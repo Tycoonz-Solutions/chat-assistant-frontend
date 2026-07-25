@@ -1246,6 +1246,7 @@ function WidgetMainView({
   ticketStatus = null,
   resumableTicketId = null,
   onResumeTicket,
+  onExitAgentChat,
   ticketResolved = false,
   showRatingPrompt = false,
   ratingBusy = false,
@@ -1315,11 +1316,11 @@ function WidgetMainView({
           }
         ) : null
       ] }),
-      canEscalate && onContactSupport && !hasActiveTicket && !resumableTicketId ? /* @__PURE__ */ jsx11(
+      hasActiveTicket && onExitAgentChat ? /* @__PURE__ */ jsx11(
         "button",
         {
           type: "button",
-          onClick: onContactSupport,
+          onClick: onExitAgentChat,
           disabled: interactionLocked,
           style: {
             flexShrink: 0,
@@ -1333,63 +1334,37 @@ function WidgetMainView({
             cursor: interactionLocked ? "not-allowed" : "pointer",
             opacity: interactionLocked ? 0.55 : 1
           },
-          children: "Get support"
+          children: "Exit agent chat"
+        }
+      ) : null,
+      !hasActiveTicket && (canEscalate && onContactSupport || resumableTicketId && onResumeTicket) ? /* @__PURE__ */ jsx11(
+        "button",
+        {
+          type: "button",
+          onClick: () => {
+            if (resumableTicketId && onResumeTicket) {
+              onResumeTicket();
+              return;
+            }
+            onContactSupport?.();
+          },
+          disabled: interactionLocked,
+          style: {
+            flexShrink: 0,
+            background: "rgba(255,255,255,0.2)",
+            border: "1px solid rgba(255,255,255,0.5)",
+            color: "white",
+            borderRadius: 999,
+            padding: "8px 14px",
+            fontSize: headerSubSize,
+            fontWeight: 600,
+            cursor: interactionLocked ? "not-allowed" : "pointer",
+            opacity: interactionLocked ? 0.55 : 1
+          },
+          children: "Talk to agent"
         }
       ) : null
     ] }),
-    resumableTicketId && onResumeTicket && !hasActiveTicket ? /* @__PURE__ */ jsxs9(
-      "div",
-      {
-        style: {
-          flexShrink: 0,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 12,
-          padding: "10px 16px",
-          background: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,109,119,0.08)",
-          borderBottom: `1px solid ${isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)"}`
-        },
-        children: [
-          /* @__PURE__ */ jsxs9(
-            "span",
-            {
-              style: {
-                fontSize: 13,
-                lineHeight: 1.4,
-                color: isDark ? "#e5e7eb" : "#374151"
-              },
-              children: [
-                "Open ticket ",
-                formatTicketId(resumableTicketId),
-                " \u2014 continue with an agent anytime."
-              ]
-            }
-          ),
-          /* @__PURE__ */ jsx11(
-            "button",
-            {
-              type: "button",
-              onClick: onResumeTicket,
-              disabled: interactionLocked,
-              style: {
-                flexShrink: 0,
-                border: "none",
-                borderRadius: 999,
-                padding: "8px 14px",
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: interactionLocked ? "not-allowed" : "pointer",
-                color: "#fff",
-                background: themeSettings.primaryColor ?? "#006D77",
-                opacity: interactionLocked ? 0.55 : 1
-              },
-              children: "Continue"
-            }
-          )
-        ]
-      }
-    ) : null,
     /* @__PURE__ */ jsxs9(
       "div",
       {
@@ -2338,9 +2313,65 @@ function compareMsgs(a, b) {
   if (a.role !== b.role) return a.role === "user" ? -1 : 1;
   return 0;
 }
+function messageDedupeKey(m) {
+  return `${m.role}|${m.text.trim().toLowerCase()}`;
+}
 function buildVisitorThread(ticketMsgs, faqExchanges) {
   const faqMsgs = faqExchanges.flatMap(faqExchangeToMsgs);
   return [...ticketMsgs, ...faqMsgs].sort(compareMsgs);
+}
+function mergeLocalIntoTicketThread(ticketThread, localMsgs) {
+  if (!localMsgs.length) return ticketThread;
+  const byId = new Set(
+    ticketThread.map((m) => m.id).filter((id) => Boolean(id))
+  );
+  const seenText = new Set(ticketThread.map(messageDedupeKey));
+  const extras = [];
+  for (const m of localMsgs) {
+    if (m.ticketCreatedNotice) continue;
+    if (m.id && byId.has(m.id)) continue;
+    if (m.localOnly) {
+      const already = extras.some(
+        (e) => e.localOnly && e.text === m.text && (e.sortAt ?? "") === (m.sortAt ?? "")
+      ) || ticketThread.some(
+        (t) => t.localOnly && t.text === m.text && (t.sortAt ?? "") === (m.sortAt ?? "")
+      );
+      if (!already) extras.push(m);
+      continue;
+    }
+    const key = messageDedupeKey(m);
+    if (!m.text.trim() || seenText.has(key)) continue;
+    seenText.add(key);
+    extras.push(m);
+  }
+  if (!extras.length) return ticketThread;
+  return [...ticketThread, ...extras].sort(compareMsgs);
+}
+var AGENT_ENTER_NOTICE = "You've reached our customer support agent";
+var AGENT_EXIT_NOTICE = "You've left customer support";
+function appendSystemNotice(messages, text) {
+  const trimmed = text.trim();
+  if (!trimmed) return messages;
+  if (messages.some(
+    (m) => m.isSystem && String(m.text || "").trim() === trimmed
+  )) {
+    return messages;
+  }
+  const sortAt = (/* @__PURE__ */ new Date()).toISOString();
+  return [
+    ...messages,
+    {
+      role: "bot",
+      text: trimmed,
+      time: (/* @__PURE__ */ new Date()).toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit"
+      }),
+      sortAt,
+      isSystem: true,
+      localOnly: true
+    }
+  ];
 }
 
 // src/lib/faq-transcript.ts
@@ -2371,14 +2402,45 @@ function clearFaqTranscript(projectToken, ticketId) {
   sessionStorage.removeItem(storageKey(projectToken, ticketId));
 }
 
+// src/lib/self-serve-transcript.ts
+function storageKey2(projectToken, email) {
+  const e = email.trim().toLowerCase();
+  return `chat-widget-conversation-${widgetProjectStorageId(projectToken)}-${e}`;
+}
+function loadSelfServeTranscript(projectToken, email) {
+  if (typeof window === "undefined" || !email?.trim()) return [];
+  try {
+    const raw = sessionStorage.getItem(storageKey2(projectToken, email));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+function saveSelfServeTranscript(projectToken, email, messages) {
+  if (typeof window === "undefined" || !email?.trim()) return;
+  try {
+    sessionStorage.setItem(
+      storageKey2(projectToken, email),
+      JSON.stringify(messages)
+    );
+  } catch {
+  }
+}
+function clearSelfServeTranscript(projectToken, email) {
+  if (typeof window === "undefined" || !email?.trim()) return;
+  sessionStorage.removeItem(storageKey2(projectToken, email));
+}
+
 // src/lib/visitor-session.ts
-function storageKey2(projectToken) {
+function storageKey3(projectToken) {
   return `chat-widget-visitor-${widgetProjectStorageId(projectToken)}`;
 }
 function loadVisitorSession(projectToken) {
   if (typeof window === "undefined") return null;
   try {
-    const raw = sessionStorage.getItem(storageKey2(projectToken));
+    const raw = sessionStorage.getItem(storageKey3(projectToken));
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!parsed?.email) return null;
@@ -2389,7 +2451,7 @@ function loadVisitorSession(projectToken) {
 }
 function saveVisitorSession(visitor, projectToken) {
   if (typeof window === "undefined") return;
-  const key = storageKey2(projectToken);
+  const key = storageKey3(projectToken);
   if (!visitor?.email) {
     sessionStorage.removeItem(key);
     return;
@@ -2498,13 +2560,13 @@ function widgetPositionClass(position) {
 }
 
 // src/lib/dismissed-tickets.ts
-function storageKey3(projectToken) {
+function storageKey4(projectToken) {
   return `chat-widget-dismissed-tickets-${widgetProjectStorageId(projectToken)}`;
 }
 function readSet(projectToken) {
   if (typeof window === "undefined") return /* @__PURE__ */ new Set();
   try {
-    const raw = sessionStorage.getItem(storageKey3(projectToken));
+    const raw = sessionStorage.getItem(storageKey4(projectToken));
     if (!raw) return /* @__PURE__ */ new Set();
     const arr = JSON.parse(raw);
     return Array.isArray(arr) ? new Set(arr.map(String)) : /* @__PURE__ */ new Set();
@@ -2514,7 +2576,7 @@ function readSet(projectToken) {
 }
 function writeSet(projectToken, ids) {
   if (typeof window === "undefined") return;
-  sessionStorage.setItem(storageKey3(projectToken), JSON.stringify([...ids]));
+  sessionStorage.setItem(storageKey4(projectToken), JSON.stringify([...ids]));
 }
 function isTicketDismissed(projectToken, ticketId) {
   return readSet(projectToken).has(String(ticketId));
@@ -2522,11 +2584,6 @@ function isTicketDismissed(projectToken, ticketId) {
 function dismissTicket(projectToken, ticketId) {
   const ids = readSet(projectToken);
   ids.add(String(ticketId));
-  writeSet(projectToken, ids);
-}
-function clearDismissedTicket(projectToken, ticketId) {
-  const ids = readSet(projectToken);
-  ids.delete(String(ticketId));
   writeSet(projectToken, ids);
 }
 
@@ -2654,6 +2711,9 @@ function ChatWidget({
   const messagesEndRef = useRef2(null);
   const visitorRef = useRef2(visitor);
   visitorRef.current = visitor;
+  const messagesRef = useRef2(messages);
+  messagesRef.current = messages;
+  const persistConversationRef = useRef2(true);
   const hasAiBackend = Boolean(sendMessage);
   const aiChatAvailable = capabilities.aiChatEnabled && hasAiBackend;
   const activeTicketId = visitor?.ticketId ?? null;
@@ -2687,8 +2747,17 @@ function ChatWidget({
       ]);
       const ticketMsgs = rows.map(ticketMessageToWidgetMsg);
       const faqExchanges = loadFaqTranscript(projectToken, tid);
+      const ticketThread = buildVisitorThread(ticketMsgs, faqExchanges);
+      const local = loadSelfServeTranscript(
+        projectToken,
+        visitorRef.current?.email
+      );
+      const merged = mergeLocalIntoTicketThread(
+        ticketThread,
+        local.length ? local : messagesRef.current
+      );
       const thread = withTicketCreatedNotice(
-        buildVisitorThread(ticketMsgs, faqExchanges),
+        merged,
         projectToken,
         String(tid),
         () => (/* @__PURE__ */ new Date()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
@@ -2729,6 +2798,7 @@ function ChatWidget({
     setSessionReady(false);
     async function hydrateVisitorSession() {
       disconnectVisitorSocket();
+      persistConversationRef.current = false;
       setMessages([]);
       setTicketSummary(null);
       setRatingSkipped(false);
@@ -2743,6 +2813,7 @@ function ChatWidget({
         visitorRef.current = null;
         setView("prechat");
         setHelpOpen(false);
+        persistConversationRef.current = true;
         setSessionReady(true);
         return;
       }
@@ -2767,24 +2838,7 @@ function ChatWidget({
             ticketId: r.ticketId ?? null
           };
           if (profile.ticketId && isTicketDismissed(projectToken, profile.ticketId)) {
-            if (apiBase !== void 0 && profile.accessToken) {
-              try {
-                const summary = await getVisitorTicket(
-                  apiBase,
-                  profile.ticketId,
-                  profile.accessToken
-                );
-                if (summary.canRate) {
-                  clearDismissedTicket(projectToken, profile.ticketId);
-                } else {
-                  profile.ticketId = null;
-                }
-              } catch {
-                profile.ticketId = null;
-              }
-            } else {
-              profile.ticketId = null;
-            }
+            profile.ticketId = null;
           }
         } catch {
           profile = {
@@ -2800,7 +2854,8 @@ function ChatWidget({
       visitorRef.current = profile;
       saveVisitorSession(profile, projectToken);
       setInTicketThread(false);
-      setMessages([]);
+      const restored = loadSelfServeTranscript(projectToken, profile.email);
+      setMessages(restored);
       setView("main");
       setHelpOpen(false);
       if (apiBase !== void 0 && profile.ticketId && profile.accessToken) {
@@ -2819,6 +2874,7 @@ function ChatWidget({
         } catch {
         }
       }
+      persistConversationRef.current = true;
       setSessionReady(true);
     }
     void hydrateVisitorSession();
@@ -2833,6 +2889,12 @@ function ChatWidget({
     }
   }, [visitor, projectToken]);
   useEffect2(() => {
+    if (!persistConversationRef.current || !sessionReady) return;
+    const email = visitorRef.current?.email;
+    if (!email) return;
+    saveSelfServeTranscript(projectToken, email, messages);
+  }, [messages, sessionReady, projectToken]);
+  useEffect2(() => {
     if (!sessionReady || !open || view !== "main" || !viewingTicketThread || !visitorAccessToken) return;
     void syncTicketThread();
     const id = window.setInterval(() => {
@@ -2840,60 +2902,6 @@ function ChatWidget({
     }, 12e3);
     return () => window.clearInterval(id);
   }, [sessionReady, open, view, viewingTicketThread, visitorAccessToken, syncTicketThread]);
-  useEffect2(() => {
-    if (!sessionReady || !open || !visitorGateEffective) return;
-    if (viewingTicketThread) return;
-    const email = visitorRef.current?.email;
-    const tok = projectToken?.trim();
-    if (apiBase === void 0 || !email || !tok) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const r = await postVisitorIdentify(apiBase, {
-          email,
-          name: visitorRef.current?.name || void 0,
-          projectToken: tok
-        });
-        if (cancelled || !r.ticketId || !r.accessToken) return;
-        let ticketId = String(r.ticketId);
-        if (isTicketDismissed(projectToken, ticketId)) {
-          const summary2 = await getVisitorTicket(apiBase, ticketId, r.accessToken);
-          if (!summary2.canRate) return;
-          clearDismissedTicket(projectToken, ticketId);
-        }
-        const summary = await getVisitorTicket(apiBase, ticketId, r.accessToken);
-        if (cancelled || !summary.canRate) return;
-        const current = visitorRef.current;
-        if (!current) return;
-        const next = {
-          ...current,
-          email: r.email ?? current.email,
-          name: r.name ?? current.name,
-          accessToken: r.accessToken,
-          ticketId
-        };
-        visitorRef.current = next;
-        setVisitor(next);
-        saveVisitorSession(next, projectToken);
-        setTicketSummary(summary);
-        setRatingSkipped(false);
-        setInTicketThread(true);
-        setHelpOpen(false);
-        setView("main");
-      } catch {
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    sessionReady,
-    open,
-    viewingTicketThread,
-    visitorGateEffective,
-    apiBase,
-    projectToken
-  ]);
   useEffect2(() => {
     const token = visitorAccessToken;
     if (apiBase === void 0 || !apiBase || !token) return;
@@ -2905,38 +2913,26 @@ function ChatWidget({
       void syncTicketThread();
     });
     const unsubTicket = subscribeVisitorSocket("ticket-updated", (payload) => {
-      const payloadTid = payload.ticketId != null ? String(payload.ticketId) : "";
-      if (!payloadTid) return;
+      const tid = visitorRef.current?.ticketId;
+      if (!tid || String(payload.ticketId ?? "") !== tid) return;
       const summary = visitorTicketSummaryFromSocket(payload);
-      if (!summary) {
-        void syncTicketThread();
-        return;
-      }
-      const localTid = visitorRef.current?.ticketId ? String(visitorRef.current.ticketId) : null;
-      if (localTid && localTid !== payloadTid && !summary.canRate) return;
-      if (summary.canRate || !localTid || localTid === payloadTid) {
-        const current = visitorRef.current;
-        if (current && current.ticketId !== payloadTid) {
-          const next = { ...current, ticketId: payloadTid };
-          visitorRef.current = next;
-          setVisitor(next);
-          saveVisitorSession(next, projectToken);
-        }
-        clearDismissedTicket(projectToken, payloadTid);
-      }
-      setTicketSummary(summary);
-      if (summary.status === "resolved") {
-        setAllowResolvedReply(false);
-        if (summary.canRate) {
-          setRatingSkipped(false);
-          if (typeof window !== "undefined") {
-            sessionStorage.removeItem(ratingSkipStorageKey(payloadTid));
+      if (summary) {
+        setTicketSummary(summary);
+        if (summary.status === "resolved") {
+          setAllowResolvedReply(false);
+          if (summary.canRate) {
+            setRatingSkipped(false);
+            if (typeof window !== "undefined") {
+              sessionStorage.removeItem(ratingSkipStorageKey(tid));
+            }
+            setInTicketThread(true);
+            setHelpOpen(false);
+            setView("main");
+            void syncTicketThread();
           }
-          setInTicketThread(true);
-          setHelpOpen(false);
-          setView("main");
-          void syncTicketThread();
         }
+      } else {
+        void syncTicketThread();
       }
     });
     return () => {
@@ -2993,8 +2989,14 @@ function ChatWidget({
     try {
       if (apiBase !== void 0 && inTicketThread && tid && token) {
         const body = text.trim();
+        const sentAt2 = (/* @__PURE__ */ new Date()).toISOString();
         setText("");
-        const userMsg2 = { role: "user", text: body, time: nowTime() };
+        const userMsg2 = {
+          role: "user",
+          text: body,
+          time: nowTime(),
+          sortAt: sentAt2
+        };
         setMessages((m) => [...m, userMsg2]);
         setSending(true);
         try {
@@ -3011,7 +3013,13 @@ function ChatWidget({
         }
         return;
       }
-      const userMsg = { role: "user", text: text.trim(), time: nowTime() };
+      const sentAt = (/* @__PURE__ */ new Date()).toISOString();
+      const userMsg = {
+        role: "user",
+        text: text.trim(),
+        time: nowTime(),
+        sortAt: sentAt
+      };
       setMessages((m) => [...m, userMsg]);
       setText("");
       setAwaitingBot(true);
@@ -3029,7 +3037,14 @@ function ChatWidget({
       } else {
         reply = AI_CHAT_UNAVAILABLE_MESSAGE;
       }
-      const botMsg = { role: "bot", text: reply, time: nowTime() };
+      const botAt = (/* @__PURE__ */ new Date()).toISOString();
+      const botMsg = {
+        role: "bot",
+        text: reply,
+        time: nowTime(),
+        sortAt: botAt,
+        ...fromFaq ? { faqLocal: true, faqForQuestion: userMsg.text } : {}
+      };
       setMessages((m) => [...m, botMsg]);
       const looksUnhelpful = !fromFaq && reply === AI_CHAT_UNAVAILABLE_MESSAGE;
       if (looksUnhelpful && canEscalate) {
@@ -3037,8 +3052,9 @@ function ChatWidget({
           ...m,
           {
             role: "bot",
-            text: "You can still reach our team using \u201CContact support\u201D in the header.",
-            time: nowTime()
+            text: "You can still reach our team using \u201CTalk to agent\u201D in the header.",
+            time: nowTime(),
+            sortAt: (/* @__PURE__ */ new Date()).toISOString()
           }
         ]);
       }
@@ -3054,8 +3070,9 @@ function ChatWidget({
           ...m,
           {
             role: "bot",
-            text: "You can still reach our team using \u201CContact support\u201D in the header.",
-            time: nowTime()
+            text: "You can still reach our team using \u201CTalk to agent\u201D in the header.",
+            time: nowTime(),
+            sortAt: (/* @__PURE__ */ new Date()).toISOString()
           }
         ]);
       }
@@ -3398,7 +3415,7 @@ function ChatWidget({
       visitorRef.current = profile;
       saveVisitorSession(profile, projectToken);
       setInTicketThread(false);
-      setMessages([]);
+      setMessages(loadSelfServeTranscript(projectToken, profile.email));
       setTicketSummary(null);
       setHelpOpen(false);
       setView("main");
@@ -3445,6 +3462,7 @@ function ChatWidget({
       clearFaqTranscript(projectToken, oldTicketId);
       clearTicketCreatedNotice(projectToken, oldTicketId);
     }
+    clearSelfServeTranscript(projectToken, current.email);
     const profile = {
       email: current.email,
       name: current.name,
@@ -3464,9 +3482,26 @@ function ChatWidget({
   }
   async function handleResumeTicket() {
     if (!activeTicketId) return;
+    saveSelfServeTranscript(
+      projectToken,
+      visitorRef.current?.email,
+      messagesRef.current
+    );
     setInTicketThread(true);
     setHelpOpen(false);
     await syncTicketThread();
+    setMessages((m) => appendSystemNotice(m, AGENT_ENTER_NOTICE));
+  }
+  function handleExitAgentChat() {
+    if (interactionLockRef.current) return;
+    setMessages((m) => {
+      const next = appendSystemNotice(m, AGENT_EXIT_NOTICE);
+      saveSelfServeTranscript(projectToken, visitorRef.current?.email, next);
+      return next;
+    });
+    setInTicketThread(false);
+    setHelpOpen(false);
+    setAllowResolvedReply(false);
   }
   function handleContinueResolvedConversation() {
     setAllowResolvedReply(true);
@@ -3501,11 +3536,13 @@ function ChatWidget({
       };
       if (r.ticketId && r.accessToken) {
         markTicketCreatedNotice(projectToken, String(r.ticketId));
+        saveSelfServeTranscript(projectToken, email, messagesRef.current);
         setInTicketThread(true);
         setTicketSummary(null);
         setRatingSkipped(false);
         setAllowResolvedReply(false);
         await syncTicketThread();
+        setMessages((m) => appendSystemNotice(m, AGENT_ENTER_NOTICE));
       } else {
         setMessages((m) => [
           ...m,
@@ -3513,7 +3550,9 @@ function ChatWidget({
         ]);
       }
       setHelpOpen(false);
-      setView("main");
+      if (view === "escalate") {
+        setView(visitorGateEffective ? "main" : "chat");
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       setMessages((m) => [
@@ -3521,7 +3560,9 @@ function ChatWidget({
         { role: "bot", text: userFacingChatError(msg), time: nowTime() }
       ]);
       setHelpOpen(false);
-      setView("main");
+      if (view === "escalate") {
+        setView(visitorGateEffective ? "main" : "chat");
+      }
     } finally {
       setEscalateBusy(false);
     }
@@ -3682,8 +3723,8 @@ function ChatWidget({
               styles,
               title: chatTitle,
               messages,
-              showTyping: awaitingBot,
-              sending,
+              showTyping: awaitingBot || escalateBusy,
+              sending: sending || escalateBusy,
               text,
               setText,
               onSend: handleSend,
@@ -3693,12 +3734,13 @@ function ChatWidget({
               onSelectFAQ: handleSelectFAQ,
               helpOpen,
               onHelpOpenChange: handleHelpOpenChange,
-              interactionLocked,
+              interactionLocked: interactionLocked || escalateBusy,
               hasActiveTicket: viewingTicketThread,
               activeTicketId: viewingTicketThread ? activeTicketId : null,
               ticketStatus: viewingTicketThread ? ticketSummary?.status ?? null : null,
               resumableTicketId,
               onResumeTicket: () => void handleResumeTicket(),
+              onExitAgentChat: handleExitAgentChat,
               ticketResolved: viewingTicketThread && ticketResolved,
               showRatingPrompt: viewingTicketThread && showRatingPrompt,
               ratingBusy,

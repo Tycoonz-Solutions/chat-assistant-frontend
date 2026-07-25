@@ -12,6 +12,8 @@ export type Msg = {
   faqForQuestion?: string;
   /** System divider (e.g. handoff to live agent) */
   isSystem?: boolean;
+  /** Widget-only notice (enter/exit agent); kept across ticket sync */
+  localOnly?: boolean;
   /** Local confirmation after escalate (widget-only, not sent to agent) */
   ticketCreatedNotice?: boolean;
   /** Live agent / staff name shown above the message bubble */

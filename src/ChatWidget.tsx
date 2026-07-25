@@ -33,10 +33,19 @@ import {
   type VisitorTicketSummary,
 } from "./widget-visitor-api";
 import {
+  AGENT_ENTER_NOTICE,
+  AGENT_EXIT_NOTICE,
+  appendSystemNotice,
   buildVisitorThread,
+  mergeLocalIntoTicketThread,
   ticketMessageToWidgetMsg,
 } from "./lib/ticket-thread-ui";
 import { appendFaqExchange, clearFaqTranscript, loadFaqTranscript } from "./lib/faq-transcript";
+import {
+  clearSelfServeTranscript,
+  loadSelfServeTranscript,
+  saveSelfServeTranscript,
+} from "./lib/self-serve-transcript";
 import {
   loadVisitorSession,
   saveVisitorSession,
@@ -198,6 +207,9 @@ export default function ChatWidget({
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const visitorRef = useRef(visitor);
   visitorRef.current = visitor;
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
+  const persistConversationRef = useRef(true);
 
   const hasAiBackend = Boolean(sendMessage);
   const aiChatAvailable =
@@ -243,8 +255,17 @@ export default function ChatWidget({
       ]);
       const ticketMsgs = rows.map(ticketMessageToWidgetMsg);
       const faqExchanges = loadFaqTranscript(projectToken, tid);
+      const ticketThread = buildVisitorThread(ticketMsgs, faqExchanges);
+      const local = loadSelfServeTranscript(
+        projectToken,
+        visitorRef.current?.email,
+      );
+      const merged = mergeLocalIntoTicketThread(
+        ticketThread,
+        local.length ? local : messagesRef.current,
+      );
       const thread = withTicketCreatedNotice(
-        buildVisitorThread(ticketMsgs, faqExchanges),
+        merged,
         projectToken,
         String(tid),
         () =>
@@ -293,6 +314,7 @@ export default function ChatWidget({
 
     async function hydrateVisitorSession() {
       disconnectVisitorSocket();
+      persistConversationRef.current = false;
       setMessages([]);
       setTicketSummary(null);
       setRatingSkipped(false);
@@ -308,6 +330,7 @@ export default function ChatWidget({
         visitorRef.current = null;
         setView("prechat");
         setHelpOpen(false);
+        persistConversationRef.current = true;
         setSessionReady(true);
         return;
       }
@@ -355,7 +378,8 @@ export default function ChatWidget({
       saveVisitorSession(profile, projectToken);
       // Land on FAQ / AI home unless this ticket still needs a rating.
       setInTicketThread(false);
-      setMessages([]);
+      const restored = loadSelfServeTranscript(projectToken, profile.email);
+      setMessages(restored);
       setView("main");
       setHelpOpen(false);
 
@@ -377,6 +401,7 @@ export default function ChatWidget({
         }
       }
 
+      persistConversationRef.current = true;
       setSessionReady(true);
     }
 
@@ -393,6 +418,13 @@ export default function ChatWidget({
       saveVisitorSession(visitor, projectToken);
     }
   }, [visitor, projectToken]);
+
+  useEffect(() => {
+    if (!persistConversationRef.current || !sessionReady) return;
+    const email = visitorRef.current?.email;
+    if (!email) return;
+    saveSelfServeTranscript(projectToken, email, messages);
+  }, [messages, sessionReady, projectToken]);
 
   useEffect(() => {
     if (!sessionReady || !open || view !== "main" || !viewingTicketThread || !visitorAccessToken) return;
@@ -511,8 +543,14 @@ export default function ChatWidget({
     try {
       if (apiBase !== undefined && inTicketThread && tid && token) {
         const body = text.trim();
+        const sentAt = new Date().toISOString();
         setText("");
-        const userMsg: Msg = { role: "user", text: body, time: nowTime() };
+        const userMsg: Msg = {
+          role: "user",
+          text: body,
+          time: nowTime(),
+          sortAt: sentAt,
+        };
         setMessages((m) => [...m, userMsg]);
         setSending(true);
         try {
@@ -530,7 +568,13 @@ export default function ChatWidget({
         return;
       }
 
-      const userMsg: Msg = { role: "user", text: text.trim(), time: nowTime() };
+      const sentAt = new Date().toISOString();
+      const userMsg: Msg = {
+        role: "user",
+        text: text.trim(),
+        time: nowTime(),
+        sortAt: sentAt,
+      };
       setMessages((m) => [...m, userMsg]);
       setText("");
       setAwaitingBot(true);
@@ -552,7 +596,14 @@ export default function ChatWidget({
       } else {
         reply = AI_CHAT_UNAVAILABLE_MESSAGE;
       }
-      const botMsg: Msg = { role: "bot", text: reply, time: nowTime() };
+      const botAt = new Date().toISOString();
+      const botMsg: Msg = {
+        role: "bot",
+        text: reply,
+        time: nowTime(),
+        sortAt: botAt,
+        ...(fromFaq ? { faqLocal: true, faqForQuestion: userMsg.text } : {}),
+      };
       setMessages((m) => [...m, botMsg]);
 
       const looksUnhelpful =
@@ -564,8 +615,9 @@ export default function ChatWidget({
           ...m,
           {
             role: "bot",
-            text: "You can still reach our team using “Contact support” in the header.",
+            text: "You can still reach our team using “Talk to agent” in the header.",
             time: nowTime(),
+            sortAt: new Date().toISOString(),
           },
         ]);
       }
@@ -581,8 +633,9 @@ export default function ChatWidget({
           ...m,
           {
             role: "bot",
-            text: "You can still reach our team using “Contact support” in the header.",
+            text: "You can still reach our team using “Talk to agent” in the header.",
             time: nowTime(),
+            sortAt: new Date().toISOString(),
           },
         ]);
       }
@@ -962,9 +1015,9 @@ export default function ChatWidget({
       setVisitor(profile);
       visitorRef.current = profile;
       saveVisitorSession(profile, projectToken);
-      // Don't auto-open an old ticket thread — keep FAQ / AI / Get support home.
+      // Don't auto-open an old ticket thread — keep FAQ / AI / Talk to agent home.
       setInTicketThread(false);
-      setMessages([]);
+      setMessages(loadSelfServeTranscript(projectToken, profile.email));
       setTicketSummary(null);
       setHelpOpen(false);
       setView("main");
@@ -1017,6 +1070,7 @@ export default function ChatWidget({
       clearFaqTranscript(projectToken, oldTicketId);
       clearTicketCreatedNotice(projectToken, oldTicketId);
     }
+    clearSelfServeTranscript(projectToken, current.email);
 
     const profile = {
       email: current.email,
@@ -1038,9 +1092,27 @@ export default function ChatWidget({
 
   async function handleResumeTicket() {
     if (!activeTicketId) return;
+    saveSelfServeTranscript(
+      projectToken,
+      visitorRef.current?.email,
+      messagesRef.current,
+    );
     setInTicketThread(true);
     setHelpOpen(false);
     await syncTicketThread();
+    setMessages((m) => appendSystemNotice(m, AGENT_ENTER_NOTICE));
+  }
+
+  function handleExitAgentChat() {
+    if (interactionLockRef.current) return;
+    setMessages((m) => {
+      const next = appendSystemNotice(m, AGENT_EXIT_NOTICE);
+      saveSelfServeTranscript(projectToken, visitorRef.current?.email, next);
+      return next;
+    });
+    setInTicketThread(false);
+    setHelpOpen(false);
+    setAllowResolvedReply(false);
   }
 
   function handleContinueResolvedConversation() {
@@ -1079,12 +1151,14 @@ export default function ChatWidget({
       };
       if (r.ticketId && r.accessToken) {
         markTicketCreatedNotice(projectToken, String(r.ticketId));
+        saveSelfServeTranscript(projectToken, email, messagesRef.current);
         setInTicketThread(true);
         // Drop stale resolved/rating UI from a previous ticket before sync.
         setTicketSummary(null);
         setRatingSkipped(false);
         setAllowResolvedReply(false);
         await syncTicketThread();
+        setMessages((m) => appendSystemNotice(m, AGENT_ENTER_NOTICE));
       } else {
         setMessages((m) => [
           ...m,
@@ -1092,7 +1166,9 @@ export default function ChatWidget({
         ]);
       }
       setHelpOpen(false);
-      setView("main");
+      if (view === "escalate") {
+        setView(visitorGateEffective ? "main" : "chat");
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       setMessages((m) => [
@@ -1100,7 +1176,9 @@ export default function ChatWidget({
         { role: "bot", text: userFacingChatError(msg), time: nowTime() },
       ]);
       setHelpOpen(false);
-      setView("main");
+      if (view === "escalate") {
+        setView(visitorGateEffective ? "main" : "chat");
+      }
     } finally {
       setEscalateBusy(false);
     }
@@ -1262,8 +1340,8 @@ export default function ChatWidget({
             styles={styles as unknown as Record<string, React.CSSProperties>}
             title={chatTitle}
             messages={messages}
-            showTyping={awaitingBot}
-            sending={sending}
+            showTyping={awaitingBot || escalateBusy}
+            sending={sending || escalateBusy}
             text={text}
             setText={setText}
             onSend={handleSend}
@@ -1273,12 +1351,13 @@ export default function ChatWidget({
             onSelectFAQ={handleSelectFAQ}
             helpOpen={helpOpen}
             onHelpOpenChange={handleHelpOpenChange}
-            interactionLocked={interactionLocked}
+            interactionLocked={interactionLocked || escalateBusy}
             hasActiveTicket={viewingTicketThread}
             activeTicketId={viewingTicketThread ? activeTicketId : null}
             ticketStatus={viewingTicketThread ? ticketSummary?.status ?? null : null}
             resumableTicketId={resumableTicketId}
             onResumeTicket={() => void handleResumeTicket()}
+            onExitAgentChat={handleExitAgentChat}
             ticketResolved={viewingTicketThread && ticketResolved}
             showRatingPrompt={viewingTicketThread && showRatingPrompt}
             ratingBusy={ratingBusy}

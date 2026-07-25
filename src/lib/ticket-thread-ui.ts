@@ -88,6 +88,10 @@ function compareMsgs(a: Msg, b: Msg): number {
   return 0;
 }
 
+function messageDedupeKey(m: Msg): string {
+  return `${m.role}|${m.text.trim().toLowerCase()}`;
+}
+
 /** Ticket chat + FAQ quick-help, sorted by time (visitor-only FAQ rows). */
 export function buildVisitorThread(
   ticketMsgs: Msg[],
@@ -95,4 +99,82 @@ export function buildVisitorThread(
 ): Msg[] {
   const faqMsgs = faqExchanges.flatMap(faqExchangeToMsgs);
   return [...ticketMsgs, ...faqMsgs].sort(compareMsgs);
+}
+
+/**
+ * Keep local FAQ/AI (and any unsynced turns) when entering or refreshing the agent thread.
+ * Prefer ticket rows when the same content already exists on the ticket.
+ */
+export function mergeLocalIntoTicketThread(
+  ticketThread: Msg[],
+  localMsgs: Msg[],
+): Msg[] {
+  if (!localMsgs.length) return ticketThread;
+
+  const byId = new Set(
+    ticketThread.map((m) => m.id).filter((id): id is string => Boolean(id)),
+  );
+  const seenText = new Set(ticketThread.map(messageDedupeKey));
+  const extras: Msg[] = [];
+
+  for (const m of localMsgs) {
+    if (m.ticketCreatedNotice) continue;
+    if (m.id && byId.has(m.id)) continue;
+    // Mode notices (enter/exit agent) must survive sync even if ticket has a similar divider.
+    if (m.localOnly) {
+      const already =
+        extras.some(
+          (e) =>
+            e.localOnly &&
+            e.text === m.text &&
+            (e.sortAt ?? "") === (m.sortAt ?? ""),
+        ) ||
+        ticketThread.some(
+          (t) =>
+            t.localOnly &&
+            t.text === m.text &&
+            (t.sortAt ?? "") === (m.sortAt ?? ""),
+        );
+      if (!already) extras.push(m);
+      continue;
+    }
+    const key = messageDedupeKey(m);
+    if (!m.text.trim() || seenText.has(key)) continue;
+    seenText.add(key);
+    extras.push(m);
+  }
+
+  if (!extras.length) return ticketThread;
+  return [...ticketThread, ...extras].sort(compareMsgs);
+}
+
+export const AGENT_ENTER_NOTICE = "You've reached our customer support agent";
+export const AGENT_EXIT_NOTICE = "You've left customer support";
+
+/** Append a centered system divider at the end of the timeline (skip if already in thread). */
+export function appendSystemNotice(messages: Msg[], text: string): Msg[] {
+  const trimmed = text.trim();
+  if (!trimmed) return messages;
+  if (
+    messages.some(
+      (m) => m.isSystem && String(m.text || "").trim() === trimmed,
+    )
+  ) {
+    return messages;
+  }
+  const sortAt = new Date().toISOString();
+  return [
+    ...messages,
+    {
+      role: "bot",
+      text: trimmed,
+      time: new Date().toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+      sortAt,
+      isSystem: true,
+      localOnly: true,
+    },
+  ];
 }

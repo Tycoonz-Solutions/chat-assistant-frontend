@@ -36,6 +36,8 @@ type Props = {
   /** Open ticket available to resume without forcing the visitor into the thread. */
   resumableTicketId?: string | null;
   onResumeTicket?: () => void;
+  /** Leave live-agent mode; keep the same message timeline and chat with FAQ/AI again. */
+  onExitAgentChat?: () => void;
   ticketResolved?: boolean;
   showRatingPrompt?: boolean;
   ratingBusy?: boolean;
@@ -73,6 +75,7 @@ export default function WidgetMainView({
   ticketStatus = null,
   resumableTicketId = null,
   onResumeTicket,
+  onExitAgentChat,
   ticketResolved = false,
   showRatingPrompt = false,
   ratingBusy = false,
@@ -159,10 +162,10 @@ export default function WidgetMainView({
             </div>
           ) : null}
         </div>
-        {canEscalate && onContactSupport && !hasActiveTicket && !resumableTicketId ? (
+        {hasActiveTicket && onExitAgentChat ? (
           <button
             type="button"
-            onClick={onContactSupport}
+            onClick={onExitAgentChat}
             disabled={interactionLocked}
             style={{
               flexShrink: 0,
@@ -177,54 +180,39 @@ export default function WidgetMainView({
               opacity: interactionLocked ? 0.55 : 1,
             }}
           >
-            Get support
+            Exit agent chat
           </button>
         ) : null}
-      </div>
-
-      {resumableTicketId && onResumeTicket && !hasActiveTicket ? (
-        <div
-          style={{
-            flexShrink: 0,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 12,
-            padding: "10px 16px",
-            background: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,109,119,0.08)",
-            borderBottom: `1px solid ${isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)"}`,
-          }}
-        >
-          <span
-            style={{
-              fontSize: 13,
-              lineHeight: 1.4,
-              color: isDark ? "#e5e7eb" : "#374151",
-            }}
-          >
-            Open ticket {formatTicketId(resumableTicketId)} — continue with an agent anytime.
-          </span>
+        {!hasActiveTicket &&
+        ((canEscalate && onContactSupport) ||
+          (resumableTicketId && onResumeTicket)) ? (
           <button
             type="button"
-            onClick={onResumeTicket}
+            onClick={() => {
+              if (resumableTicketId && onResumeTicket) {
+                onResumeTicket();
+                return;
+              }
+              onContactSupport?.();
+            }}
             disabled={interactionLocked}
             style={{
               flexShrink: 0,
-              border: "none",
+              background: "rgba(255,255,255,0.2)",
+              border: "1px solid rgba(255,255,255,0.5)",
+              color: "white",
               borderRadius: 999,
               padding: "8px 14px",
-              fontSize: 13,
+              fontSize: headerSubSize,
               fontWeight: 600,
               cursor: interactionLocked ? "not-allowed" : "pointer",
-              color: "#fff",
-              background: themeSettings.primaryColor ?? "#006D77",
               opacity: interactionLocked ? 0.55 : 1,
             }}
           >
-            Continue
+            Talk to agent
           </button>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
 
       <div
         style={{
