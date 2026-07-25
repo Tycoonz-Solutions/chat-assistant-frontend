@@ -1,5 +1,5 @@
 export const AI_CHAT_UNAVAILABLE_MESSAGE =
-  "AI chat is currently unavailable. Please contact our support team for assistance";
+  "AI chat is currently unavailable. Please use “Talk to agent” in the header to reach our support team.";
 
 export const RATE_LIMIT_CHAT_ERROR_MESSAGE =
   "We're busy right now. Please try again in a moment or contact support.";

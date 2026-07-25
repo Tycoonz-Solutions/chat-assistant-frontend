@@ -605,40 +605,13 @@ export default function ChatWidget({
         ...(fromFaq ? { faqLocal: true, faqForQuestion: userMsg.text } : {}),
       };
       setMessages((m) => [...m, botMsg]);
-
-      const looksUnhelpful =
-        !fromFaq &&
-        reply === AI_CHAT_UNAVAILABLE_MESSAGE;
-
-      if (looksUnhelpful && canEscalate) {
-        setMessages((m) => [
-          ...m,
-          {
-            role: "bot",
-            text: "You can still reach our team using “Talk to agent” in the header.",
-            time: nowTime(),
-            sortAt: new Date().toISOString(),
-          },
-        ]);
-      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       const reply = userFacingChatError(msg);
       setMessages((m) => [
         ...m,
-        { role: "bot", text: reply, time: nowTime() },
+        { role: "bot", text: reply, time: nowTime(), sortAt: new Date().toISOString() },
       ]);
-      if (canEscalate && reply === AI_CHAT_UNAVAILABLE_MESSAGE) {
-        setMessages((m) => [
-          ...m,
-          {
-            role: "bot",
-            text: "You can still reach our team using “Talk to agent” in the header.",
-            time: nowTime(),
-            sortAt: new Date().toISOString(),
-          },
-        ]);
-      }
     } finally {
       setAwaitingBot(false);
       releaseInteractionLock();

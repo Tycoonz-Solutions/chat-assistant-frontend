@@ -2565,7 +2565,7 @@ function visitorTicketSummaryFromSocket(payload) {
 }
 
 // src/lib/chat-messages.ts
-var AI_CHAT_UNAVAILABLE_MESSAGE = "AI chat is currently unavailable. Please contact our support team for assistance";
+var AI_CHAT_UNAVAILABLE_MESSAGE = "AI chat is currently unavailable. Please use \u201CTalk to agent\u201D in the header to reach our support team.";
 var RATE_LIMIT_CHAT_ERROR_MESSAGE = "We're busy right now. Please try again in a moment or contact support.";
 var GENERIC_CHAT_ERROR_MESSAGE = "Something went wrong. Please try again in a moment.";
 function isAiChatUnavailableError(message) {
@@ -3088,36 +3088,13 @@ function ChatWidget({
         ...fromFaq ? { faqLocal: true, faqForQuestion: userMsg.text } : {}
       };
       setMessages((m) => [...m, botMsg]);
-      const looksUnhelpful = !fromFaq && reply === AI_CHAT_UNAVAILABLE_MESSAGE;
-      if (looksUnhelpful && canEscalate) {
-        setMessages((m) => [
-          ...m,
-          {
-            role: "bot",
-            text: "You can still reach our team using \u201CTalk to agent\u201D in the header.",
-            time: nowTime(),
-            sortAt: (/* @__PURE__ */ new Date()).toISOString()
-          }
-        ]);
-      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       const reply = userFacingChatError(msg);
       setMessages((m) => [
         ...m,
-        { role: "bot", text: reply, time: nowTime() }
+        { role: "bot", text: reply, time: nowTime(), sortAt: (/* @__PURE__ */ new Date()).toISOString() }
       ]);
-      if (canEscalate && reply === AI_CHAT_UNAVAILABLE_MESSAGE) {
-        setMessages((m) => [
-          ...m,
-          {
-            role: "bot",
-            text: "You can still reach our team using \u201CTalk to agent\u201D in the header.",
-            time: nowTime(),
-            sortAt: (/* @__PURE__ */ new Date()).toISOString()
-          }
-        ]);
-      }
     } finally {
       setAwaitingBot(false);
       releaseInteractionLock();
