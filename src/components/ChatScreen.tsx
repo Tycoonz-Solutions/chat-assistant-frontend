@@ -3,6 +3,7 @@ import React from 'react';
 import { ArrowLeft } from 'lucide-react';
 import MessageList from './MessageList';
 import InputArea from './InputArea';
+import WidgetCloseButton from './WidgetCloseButton';
 import type { ThemeSettings } from '../../types';
 
 export default function ChatScreen({
@@ -21,6 +22,7 @@ export default function ChatScreen({
   onContactSupport,
   interactionLocked = false,
   apiBaseUrl,
+  onClose,
 }: {
   styles: Record<string, React.CSSProperties>;
   title: string;
@@ -37,10 +39,11 @@ export default function ChatScreen({
   canEscalate?: boolean;
   onContactSupport?: () => void;
   apiBaseUrl?: string;
+  onClose?: () => void;
 }) {
   return (
     <div style={styles.chatScreen}>
-      <div style={styles.header as React.CSSProperties}>
+      <div style={styles.header as React.CSSProperties} className="chat-widget-sheet-header">
         <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0 }}>
           <button
             type="button"
@@ -91,26 +94,28 @@ export default function ChatScreen({
             </div>
           </div>
         </div>
-        {canEscalate && onContactSupport ? (
-          <button
-            type="button"
-            onClick={onContactSupport}
-            style={{
-              flexShrink: 0,
-              marginLeft: 8,
-              background: "rgba(255,255,255,0.2)",
-              border: "1px solid rgba(255,255,255,0.5)",
-              color: "white",
-              borderRadius: 999,
-              padding: "8px 14px",
-              fontSize: 12,
-              fontWeight: 600,
-              cursor: "pointer",
-            }}
-          >
-            Contact support
-          </button>
-        ) : null}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+          {canEscalate && onContactSupport ? (
+            <button
+              type="button"
+              onClick={onContactSupport}
+              style={{
+                flexShrink: 0,
+                background: "rgba(255,255,255,0.2)",
+                border: "1px solid rgba(255,255,255,0.5)",
+                color: "white",
+                borderRadius: 999,
+                padding: "8px 14px",
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              Contact support
+            </button>
+          ) : null}
+          {onClose ? <WidgetCloseButton onClose={onClose} /> : null}
+        </div>
       </div>
 
       <MessageList

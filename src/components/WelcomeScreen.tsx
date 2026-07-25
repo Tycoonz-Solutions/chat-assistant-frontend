@@ -3,6 +3,7 @@ import React from "react";
 import { List, ChevronRight, Send, type LucideIcon } from "lucide-react";
 import type { FAQ, ThemeSettings } from "../../types/index";
 import { resolveWelcomeCopy } from "../lib/greeting-message";
+import WidgetCloseButton from "./WidgetCloseButton";
 
 export default function WelcomeScreen({
   styles,
@@ -16,6 +17,7 @@ export default function WelcomeScreen({
   canEscalate,
   onCreateSupportTicket,
   interactionLocked = false,
+  onClose,
 }: {
   styles: any;
   faqs: FAQ[];
@@ -28,20 +30,33 @@ export default function WelcomeScreen({
   themeSettings: ThemeSettings;
   canEscalate?: boolean;
   onCreateSupportTicket?: () => void;
+  onClose?: () => void;
 }) {
   const { headline, subtitle } = resolveWelcomeCopy(themeSettings);
   return (
     <div style={styles.welcomeScreen}>
       <div style={styles.welcomeHeader} className="chat-widget-welcome-header">
-        <div style={{ position: 'relative', zIndex: 1 }}>
-          <h2 style={{ margin: 0, fontSize: themeSettings?.fontSizeBase, fontWeight: 700, marginBottom: 8 }}>
-            {headline}
-          </h2>
-          {subtitle ? (
-            <p style={{ margin: 0, fontSize: themeSettings?.fontSizeBase / 2, opacity: 0.95, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
-              {subtitle}
-            </p>
-          ) : null}
+        <div
+          style={{
+            position: "relative",
+            zIndex: 1,
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "space-between",
+            gap: 12,
+          }}
+        >
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <h2 style={{ margin: 0, fontSize: themeSettings?.fontSizeBase, fontWeight: 700, marginBottom: 8 }}>
+              {headline}
+            </h2>
+            {subtitle ? (
+              <p style={{ margin: 0, fontSize: themeSettings?.fontSizeBase / 2, opacity: 0.95, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
+                {subtitle}
+              </p>
+            ) : null}
+          </div>
+          {onClose ? <WidgetCloseButton onClose={onClose} /> : null}
         </div>
       </div>
 

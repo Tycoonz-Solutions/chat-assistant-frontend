@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import type { ThemeSettings } from "../../types/index";
 import { resolveWelcomeCopy } from "../lib/greeting-message";
+import WidgetCloseButton from "./WidgetCloseButton";
 import {
   INVALID_EMAIL_MESSAGE,
   REQUIRED_EMAIL_MESSAGE,
@@ -13,12 +14,14 @@ export default function PreChatScreen({
   onContinue,
   busy,
   error,
+  onClose,
 }: {
   styles: Record<string, React.CSSProperties>;
   themeSettings: ThemeSettings;
   onContinue: (payload: { email: string; name: string }) => void | Promise<void>;
   busy: boolean;
   error?: string | null;
+  onClose?: () => void;
 }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -31,30 +34,41 @@ export default function PreChatScreen({
   return (
     <div style={styles.welcomeScreen}>
       <div style={styles.welcomeHeader} className="chat-widget-welcome-header">
-        <div style={{ position: "relative", zIndex: 1 }}>
-          <h2
-            style={{
-              margin: 0,
-              fontSize: headerFontSize,
-              fontWeight: 700,
-              marginBottom: 8,
-            }}
-          >
-            {headline}
-          </h2>
-          {subtitle ? (
-            <p
+        <div
+          style={{
+            position: "relative",
+            zIndex: 1,
+            display: "flex",
+            alignItems: "flex-start",
+            gap: 12,
+          }}
+        >
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h2
               style={{
                 margin: 0,
-                fontSize: bodyFontSize,
-                opacity: 0.95,
-                lineHeight: 1.5,
-                whiteSpace: "pre-wrap",
+                fontSize: headerFontSize,
+                fontWeight: 700,
+                marginBottom: 8,
               }}
             >
-              {subtitle}
-            </p>
-          ) : null}
+              {headline}
+            </h2>
+            {subtitle ? (
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: bodyFontSize,
+                  opacity: 0.95,
+                  lineHeight: 1.5,
+                  whiteSpace: "pre-wrap",
+                }}
+              >
+                {subtitle}
+              </p>
+            ) : null}
+          </div>
+          {onClose ? <WidgetCloseButton onClose={onClose} /> : null}
         </div>
       </div>
 

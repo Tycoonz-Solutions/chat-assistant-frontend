@@ -490,6 +490,13 @@ export default function ChatWidget({
   useEffect(() => {
     function onDocClick(e: MouseEvent) {
       if (!open) return;
+      // Full-screen mobile: no "outside" to click — close via header X.
+      if (
+        typeof window !== "undefined" &&
+        window.matchMedia("(max-width: 640px)").matches
+      ) {
+        return;
+      }
       if (!panelRef.current) return;
       if (!panelRef.current.contains(e.target as Node)) {
         setOpen(false);
@@ -506,6 +513,16 @@ export default function ChatWidget({
     document.addEventListener("mousedown", onDocClick);
     return () => document.removeEventListener("mousedown", onDocClick);
   }, [open, visitorGateEffective]);
+
+  useEffect(() => {
+    if (!open || typeof window === "undefined") return;
+    if (!window.matchMedia("(max-width: 640px)").matches) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -1214,52 +1231,67 @@ export default function ChatWidget({
           font-size: ${formFontSize}px !important;
           line-height: 1.5;
         }
-        @media (max-width: 768px), (max-height: 720px) {
+        /* Phones only — tablets (e.g. 768px) keep the floating popup */
+        @media (max-width: 640px) {
           .chat-panel {
-            left: 12px !important;
-            right: 12px !important;
-            width: auto !important;
+            top: 0 !important;
+            right: 0 !important;
+            bottom: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            width: 100dvw !important;
             max-width: none !important;
-            height: auto !important;
+            height: 100% !important;
+            height: 100dvh !important;
             max-height: none !important;
-            border-radius: 16px !important;
+            border-radius: 0 !important;
+            box-shadow: none !important;
           }
           .chat-panel.chat-pos-br,
-          .chat-panel.chat-pos-bl {
-            top: calc(env(safe-area-inset-top, 0px) + 24px) !important;
-            bottom: 88px !important;
-          }
+          .chat-panel.chat-pos-bl,
           .chat-panel.chat-pos-tr,
           .chat-panel.chat-pos-tl {
-            top: 88px !important;
-            bottom: calc(env(safe-area-inset-bottom, 0px) + 24px) !important;
+            top: 0 !important;
+            right: 0 !important;
+            bottom: 0 !important;
+            left: 0 !important;
+          }
+          .chat-widget-sheet-header,
+          .chat-widget-welcome-header {
+            border-radius: 0 !important;
+            border-top-left-radius: 0 !important;
+            border-top-right-radius: 0 !important;
+          }
+          /* Close lives in the header on phones — hide the floating launcher while open */
+          .chat-widget-floating-btn.is-open {
+            display: none !important;
           }
           .chat-widget-floating-btn {
-            width: 48px !important;
-            height: 48px !important;
+            width: 56px !important;
+            height: 56px !important;
           }
           .chat-widget-floating-btn svg {
-            width: 22px !important;
-            height: 22px !important;
+            width: 24px !important;
+            height: 24px !important;
           }
           .chat-widget-floating-btn.chat-pos-br,
           .chat-widget-floating-btn.chat-pos-tr {
-            right: 20px !important;
+            right: max(16px, env(safe-area-inset-right, 0px)) !important;
             left: auto !important;
           }
           .chat-widget-floating-btn.chat-pos-bl,
           .chat-widget-floating-btn.chat-pos-tl {
-            left: 20px !important;
+            left: max(16px, env(safe-area-inset-left, 0px)) !important;
             right: auto !important;
           }
           .chat-widget-floating-btn.chat-pos-br,
           .chat-widget-floating-btn.chat-pos-bl {
-            bottom: 20px !important;
+            bottom: max(16px, env(safe-area-inset-bottom, 0px)) !important;
             top: auto !important;
           }
           .chat-widget-floating-btn.chat-pos-tr,
           .chat-widget-floating-btn.chat-pos-tl {
-            top: 20px !important;
+            top: max(16px, env(safe-area-inset-top, 0px)) !important;
             bottom: auto !important;
           }
           .chat-widget-welcome-header {
@@ -1280,6 +1312,27 @@ export default function ChatWidget({
             padding: 20px !important;
           }
         }
+        @media (min-width: 641px) and (max-height: 720px) {
+          .chat-panel {
+            left: 12px !important;
+            right: 12px !important;
+            width: auto !important;
+            max-width: none !important;
+            height: auto !important;
+            max-height: none !important;
+            border-radius: 16px !important;
+          }
+          .chat-panel.chat-pos-br,
+          .chat-panel.chat-pos-bl {
+            top: calc(env(safe-area-inset-top, 0px) + 24px) !important;
+            bottom: 88px !important;
+          }
+          .chat-panel.chat-pos-tr,
+          .chat-panel.chat-pos-tl {
+            top: 88px !important;
+            bottom: calc(env(safe-area-inset-bottom, 0px) + 24px) !important;
+          }
+        }
       `}</style>
 
       <FloatingButton
@@ -1287,7 +1340,7 @@ export default function ChatWidget({
         setOpen={setOpen}
         styles={styles}
         themeSettings={themeSettings}
-        className={`chat-widget-floating-btn chat-pos-${positionClass}`}
+        className={`chat-widget-floating-btn chat-pos-${positionClass}${open ? " is-open" : ""}`}
       />
 
       <div
@@ -1304,6 +1357,7 @@ export default function ChatWidget({
               onContinue={onPreChatContinue}
               busy={prechatBusy}
               error={prechatError}
+              onClose={() => setOpen(false)}
             />
           </div>
         )}
@@ -1331,6 +1385,7 @@ export default function ChatWidget({
             resumableTicketId={resumableTicketId}
             onResumeTicket={() => void handleResumeTicket()}
             onExitAgentChat={handleExitAgentChat}
+            onClose={() => setOpen(false)}
             ticketResolved={viewingTicketThread && ticketResolved}
             showRatingPrompt={viewingTicketThread && showRatingPrompt}
             ratingBusy={ratingBusy}
@@ -1365,6 +1420,7 @@ export default function ChatWidget({
             themeSettings={themeSettings}
             canEscalate={canEscalate}
             onCreateSupportTicket={() => setView("escalate")}
+            onClose={() => setOpen(false)}
           />
         ) : null}
 
@@ -1385,6 +1441,7 @@ export default function ChatWidget({
             canEscalate={canEscalate}
             onContactSupport={() => setView("escalate")}
             apiBaseUrl={apiBase}
+            onClose={() => setOpen(false)}
           />
         ) : null}
 
@@ -1403,6 +1460,7 @@ export default function ChatWidget({
             initialEmail={visitor?.email}
             initialName={visitor?.name}
             initialSummary={lastUserMessageForEscalate(messages)}
+            onClose={() => setOpen(false)}
           />
         )}
       </div>

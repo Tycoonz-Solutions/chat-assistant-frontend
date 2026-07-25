@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import type { ThemeSettings } from "../../types/index";
 import { widgetFormFontSize, widgetHeaderSubFontSize } from "../lib/widget-font-size";
+import WidgetCloseButton from "./WidgetCloseButton";
 import {
   INVALID_EMAIL_MESSAGE,
   REQUIRED_EMAIL_MESSAGE,
@@ -26,6 +27,7 @@ export default function EscalateScreen({
   initialEmail,
   initialName,
   initialSummary,
+  onClose,
 }: {
   styles: Record<string, React.CSSProperties>;
   themeSettings: ThemeSettings;
@@ -37,6 +39,7 @@ export default function EscalateScreen({
   initialEmail?: string;
   initialName?: string;
   initialSummary?: string;
+  onClose?: () => void;
 }) {
   const [subject, setSubject] = useState("");
   const [summary, setSummary] = useState(initialSummary ?? "");
@@ -54,8 +57,8 @@ export default function EscalateScreen({
 
   return (
     <div style={styles.chatScreen}>
-      <div style={styles.header}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+      <div style={styles.header} className="chat-widget-sheet-header">
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0 }}>
           <button
             type="button"
             onClick={onBack}
@@ -73,7 +76,7 @@ export default function EscalateScreen({
           >
             <ArrowLeft size={20} />
           </button>
-          <div>
+          <div style={{ minWidth: 0 }}>
             <div
               style={{
                 fontWeight: 600,
@@ -94,6 +97,7 @@ export default function EscalateScreen({
             </div>
           </div>
         </div>
+        {onClose ? <WidgetCloseButton onClose={onClose} /> : null}
       </div>
 
       <div

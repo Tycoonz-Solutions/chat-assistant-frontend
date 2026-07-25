@@ -74,8 +74,42 @@ function resolveWelcomeCopy(themeSettings, options) {
   return { headline, subtitle };
 }
 
+// src/components/WidgetCloseButton.tsx
+import { X as X2 } from "lucide-react";
+import { jsx as jsx2 } from "react/jsx-runtime";
+function WidgetCloseButton({
+  onClose,
+  size = 22
+}) {
+  return /* @__PURE__ */ jsx2(
+    "button",
+    {
+      type: "button",
+      onClick: onClose,
+      "aria-label": "Close chat",
+      className: "chat-widget-close-btn",
+      style: {
+        flexShrink: 0,
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: 36,
+        height: 36,
+        marginLeft: 8,
+        padding: 0,
+        border: "none",
+        borderRadius: 999,
+        background: "rgba(255,255,255,0.18)",
+        color: "white",
+        cursor: "pointer"
+      },
+      children: /* @__PURE__ */ jsx2(X2, { size, strokeWidth: 2.25 })
+    }
+  );
+}
+
 // src/components/WelcomeScreen.tsx
-import { jsx as jsx2, jsxs } from "react/jsx-runtime";
+import { jsx as jsx3, jsxs } from "react/jsx-runtime";
 function WelcomeScreen({
   styles,
   faqs,
@@ -87,15 +121,32 @@ function WelcomeScreen({
   themeSettings,
   canEscalate,
   onCreateSupportTicket,
-  interactionLocked = false
+  interactionLocked = false,
+  onClose
 }) {
   const { headline, subtitle } = resolveWelcomeCopy(themeSettings);
   return /* @__PURE__ */ jsxs("div", { style: styles.welcomeScreen, children: [
-    /* @__PURE__ */ jsx2("div", { style: styles.welcomeHeader, className: "chat-widget-welcome-header", children: /* @__PURE__ */ jsxs("div", { style: { position: "relative", zIndex: 1 }, children: [
-      /* @__PURE__ */ jsx2("h2", { style: { margin: 0, fontSize: themeSettings?.fontSizeBase, fontWeight: 700, marginBottom: 8 }, children: headline }),
-      subtitle ? /* @__PURE__ */ jsx2("p", { style: { margin: 0, fontSize: themeSettings?.fontSizeBase / 2, opacity: 0.95, lineHeight: 1.5, whiteSpace: "pre-wrap" }, children: subtitle }) : null
-    ] }) }),
-    canEscalate && onCreateSupportTicket ? /* @__PURE__ */ jsx2(
+    /* @__PURE__ */ jsx3("div", { style: styles.welcomeHeader, className: "chat-widget-welcome-header", children: /* @__PURE__ */ jsxs(
+      "div",
+      {
+        style: {
+          position: "relative",
+          zIndex: 1,
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+          gap: 12
+        },
+        children: [
+          /* @__PURE__ */ jsxs("div", { style: { minWidth: 0, flex: 1 }, children: [
+            /* @__PURE__ */ jsx3("h2", { style: { margin: 0, fontSize: themeSettings?.fontSizeBase, fontWeight: 700, marginBottom: 8 }, children: headline }),
+            subtitle ? /* @__PURE__ */ jsx3("p", { style: { margin: 0, fontSize: themeSettings?.fontSizeBase / 2, opacity: 0.95, lineHeight: 1.5, whiteSpace: "pre-wrap" }, children: subtitle }) : null
+          ] }),
+          onClose ? /* @__PURE__ */ jsx3(WidgetCloseButton, { onClose }) : null
+        ]
+      }
+    ) }),
+    canEscalate && onCreateSupportTicket ? /* @__PURE__ */ jsx3(
       "div",
       {
         style: {
@@ -103,7 +154,7 @@ function WelcomeScreen({
           padding: "8px 12px 0",
           textAlign: "center"
         },
-        children: /* @__PURE__ */ jsx2(
+        children: /* @__PURE__ */ jsx3(
           "button",
           {
             type: "button",
@@ -123,7 +174,7 @@ function WelcomeScreen({
         )
       }
     ) : null,
-    /* @__PURE__ */ jsx2(
+    /* @__PURE__ */ jsx3(
       "div",
       {
         style: {
@@ -145,8 +196,8 @@ function WelcomeScreen({
             padding: "0 4px",
             flexShrink: 0
           }, children: [
-            themeSettings.isGradient ? /* @__PURE__ */ jsx2(GradientIcon, { themeSettings }) : /* @__PURE__ */ jsx2(List, { size: 20, color: themeSettings.primaryColor }),
-            /* @__PURE__ */ jsx2("h3", { style: { margin: 0, fontSize: themeSettings?.fontSizeBase ? themeSettings?.fontSizeBase / 2 + 4 : 16, fontWeight: 600, color: themeSettings?.isDarkMode ? "#fff" : "#1a1a1a" }, children: "Quick FAQs" })
+            themeSettings.isGradient ? /* @__PURE__ */ jsx3(GradientIcon, { themeSettings }) : /* @__PURE__ */ jsx3(List, { size: 20, color: themeSettings.primaryColor }),
+            /* @__PURE__ */ jsx3("h3", { style: { margin: 0, fontSize: themeSettings?.fontSizeBase ? themeSettings?.fontSizeBase / 2 + 4 : 16, fontWeight: 600, color: themeSettings?.isDarkMode ? "#fff" : "#1a1a1a" }, children: "Quick FAQs" })
           ] }),
           /* @__PURE__ */ jsxs(
             "div",
@@ -161,7 +212,7 @@ function WelcomeScreen({
                 overflowY: "auto"
               },
               children: [
-                faqs.length === 0 ? /* @__PURE__ */ jsx2(
+                faqs.length === 0 ? /* @__PURE__ */ jsx3(
                   "p",
                   {
                     style: {
@@ -174,7 +225,7 @@ function WelcomeScreen({
                     children: "No FAQs yet for this project. Add them in the admin under FAQs/Knowledge Base."
                   }
                 ) : null,
-                faqs.map((faq, index) => /* @__PURE__ */ jsx2(
+                faqs.map((faq, index) => /* @__PURE__ */ jsx3(
                   "button",
                   {
                     type: "button",
@@ -201,7 +252,7 @@ function WelcomeScreen({
                       padding: "4px 10px",
                       cursor: "pointer"
                     }, children: [
-                      /* @__PURE__ */ jsx2("span", { style: {
+                      /* @__PURE__ */ jsx3("span", { style: {
                         fontSize: themeSettings?.fontSizeBase ? themeSettings?.fontSizeBase / 2 + 2 : 16,
                         color: index === 0 ? themeSettings?.isDarkMode ? "#fff" : "#1a1a1a" : themeSettings?.isDarkMode ? "#ccc" : "#4a5568",
                         fontWeight: index === 0 ? 600 : 500,
@@ -223,8 +274,8 @@ function WelcomeScreen({
         ] })
       }
     ),
-    /* @__PURE__ */ jsx2("div", { style: styles.inputArea, children: /* @__PURE__ */ jsx2("form", { onSubmit: onSend, children: /* @__PURE__ */ jsxs("div", { style: styles.inputWrapper, children: [
-      /* @__PURE__ */ jsx2(
+    /* @__PURE__ */ jsx3("div", { style: styles.inputArea, children: /* @__PURE__ */ jsx3("form", { onSubmit: onSend, children: /* @__PURE__ */ jsxs("div", { style: styles.inputWrapper, children: [
+      /* @__PURE__ */ jsx3(
         "input",
         {
           value: text,
@@ -246,7 +297,7 @@ function WelcomeScreen({
           },
           disabled: interactionLocked,
           children: [
-            /* @__PURE__ */ jsx2(Send, { size: 18 }),
+            /* @__PURE__ */ jsx3(Send, { size: 18 }),
             " Send"
           ]
         }
@@ -257,11 +308,11 @@ function WelcomeScreen({
 function GradientIcon({ themeSettings }) {
   const gradientId = "iconGradient";
   return /* @__PURE__ */ jsxs("svg", { width: "20", height: "20", viewBox: "0 0 24 24", strokeWidth: "2", fill: "none", strokeLinecap: "round", strokeLinejoin: "round", children: [
-    /* @__PURE__ */ jsx2("defs", { children: /* @__PURE__ */ jsxs("linearGradient", { id: gradientId, x1: "0%", y1: "0%", x2: "100%", y2: "0%", children: [
-      /* @__PURE__ */ jsx2("stop", { offset: "0%", stopColor: themeSettings.primaryColor }),
-      /* @__PURE__ */ jsx2("stop", { offset: "100%", stopColor: themeSettings.secondaryColor })
+    /* @__PURE__ */ jsx3("defs", { children: /* @__PURE__ */ jsxs("linearGradient", { id: gradientId, x1: "0%", y1: "0%", x2: "100%", y2: "0%", children: [
+      /* @__PURE__ */ jsx3("stop", { offset: "0%", stopColor: themeSettings.primaryColor }),
+      /* @__PURE__ */ jsx3("stop", { offset: "100%", stopColor: themeSettings.secondaryColor })
     ] }) }),
-    /* @__PURE__ */ jsx2("path", { d: "M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01", stroke: `url(#${gradientId})` })
+    /* @__PURE__ */ jsx3("path", { d: "M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01", stroke: `url(#${gradientId})` })
   ] });
 }
 var getThemedIcon = ({
@@ -282,16 +333,16 @@ var getThemedIcon = ({
         strokeLinecap: "round",
         strokeLinejoin: "round",
         children: [
-          /* @__PURE__ */ jsx2("defs", { children: /* @__PURE__ */ jsxs("linearGradient", { id: gradientId, x1: "0%", y1: "0%", x2: "100%", y2: "0%", children: [
-            /* @__PURE__ */ jsx2("stop", { offset: "0%", stopColor: themeSettings.primaryColor }),
-            /* @__PURE__ */ jsx2("stop", { offset: "100%", stopColor: themeSettings.secondaryColor })
+          /* @__PURE__ */ jsx3("defs", { children: /* @__PURE__ */ jsxs("linearGradient", { id: gradientId, x1: "0%", y1: "0%", x2: "100%", y2: "0%", children: [
+            /* @__PURE__ */ jsx3("stop", { offset: "0%", stopColor: themeSettings.primaryColor }),
+            /* @__PURE__ */ jsx3("stop", { offset: "100%", stopColor: themeSettings.secondaryColor })
           ] }) }),
-          /* @__PURE__ */ jsx2(Icon, { stroke: `url(#${gradientId})`, fill: "none", size })
+          /* @__PURE__ */ jsx3(Icon, { stroke: `url(#${gradientId})`, fill: "none", size })
         ]
       }
     );
   } else {
-    return /* @__PURE__ */ jsx2(Icon, { size, color: themeSettings.primaryColor ?? "#006D77" });
+    return /* @__PURE__ */ jsx3(Icon, { size, color: themeSettings.primaryColor ?? "#006D77" });
   }
 };
 
@@ -350,7 +401,7 @@ function widgetWelcomeHeadlineSize(fontSizeBase) {
 
 // src/components/LinkifiedText.tsx
 import { Fragment } from "react";
-import { Fragment as Fragment2, jsx as jsx3 } from "react/jsx-runtime";
+import { Fragment as Fragment2, jsx as jsx4 } from "react/jsx-runtime";
 var URL_RE = /\b((?:https?:\/\/|www\.)[^\s<>"'`]+)/gi;
 function trimTrailingPunctuation(url) {
   let core = url;
@@ -385,7 +436,7 @@ function LinkifiedText({ text }) {
     const href = toHref(hrefCore);
     if (href && hrefCore) {
       nodes.push(
-        /* @__PURE__ */ jsx3(
+        /* @__PURE__ */ jsx4(
           "a",
           {
             href,
@@ -406,13 +457,13 @@ function LinkifiedText({ text }) {
   if (lastIndex < raw.length) {
     nodes.push(raw.slice(lastIndex));
   }
-  return /* @__PURE__ */ jsx3(Fragment2, { children: nodes.map(
-    (node, i) => typeof node === "string" ? /* @__PURE__ */ jsx3(Fragment, { children: node }, `t-${i}`) : node
+  return /* @__PURE__ */ jsx4(Fragment2, { children: nodes.map(
+    (node, i) => typeof node === "string" ? /* @__PURE__ */ jsx4(Fragment, { children: node }, `t-${i}`) : node
   ) });
 }
 
 // src/components/MessageList.tsx
-import { jsx as jsx4, jsxs as jsxs2 } from "react/jsx-runtime";
+import { jsx as jsx5, jsxs as jsxs2 } from "react/jsx-runtime";
 function MessageList({
   styles,
   messages,
@@ -425,7 +476,7 @@ function MessageList({
   const nowTime = () => (/* @__PURE__ */ new Date()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   const defaultAvatarSrc = widgetBotAvatarUrl(apiBaseUrl, themeSettings.botAvatarUrl);
   return /* @__PURE__ */ jsxs2("div", { style: styles.messagesArea, className: "hide-scrollbar", children: [
-    messages.length === 0 && !hideEmptyPlaceholder && /* @__PURE__ */ jsx4("div", { style: {
+    messages.length === 0 && !hideEmptyPlaceholder && /* @__PURE__ */ jsx5("div", { style: {
       textAlign: "center",
       color: themeSettings?.isDarkMode ? "#fff" : "#718096",
       fontSize: widgetBodyFontSize(themeSettings?.fontSizeBase),
@@ -433,7 +484,7 @@ function MessageList({
     }, children: "Start a conversation..." }),
     messages.map((msg, idx) => {
       if (msg.isSystem) {
-        return /* @__PURE__ */ jsx4(
+        return /* @__PURE__ */ jsx5(
           "div",
           {
             style: {
@@ -441,7 +492,7 @@ function MessageList({
               justifyContent: "center",
               padding: "12px 16px"
             },
-            children: /* @__PURE__ */ jsx4(
+            children: /* @__PURE__ */ jsx5(
               "div",
               {
                 style: {
@@ -467,7 +518,7 @@ function MessageList({
       const showStaffName = isBot && msg.isStaff && msg.senderName;
       const avatarSrc = msg.isStaff && resolveWidgetAssetUrl(apiBaseUrl, msg.senderAvatar) || defaultAvatarSrc;
       return /* @__PURE__ */ jsxs2("div", { className: `message-row ${isBot ? "bot" : "user"}`, children: [
-        isBot && /* @__PURE__ */ jsx4("div", { className: "bot-avatar", "aria-hidden": true, children: /* @__PURE__ */ jsx4(
+        isBot && /* @__PURE__ */ jsx5("div", { className: "bot-avatar", "aria-hidden": true, children: /* @__PURE__ */ jsx5(
           "img",
           {
             src: avatarSrc,
@@ -481,7 +532,7 @@ function MessageList({
           }
         ) }),
         /* @__PURE__ */ jsxs2("div", { className: `message-content ${isBot ? "bot" : "user"}`, children: [
-          showStaffName ? /* @__PURE__ */ jsx4(
+          showStaffName ? /* @__PURE__ */ jsx5(
             "div",
             {
               style: {
@@ -494,15 +545,15 @@ function MessageList({
               children: msg.senderName
             }
           ) : null,
-          /* @__PURE__ */ jsx4(
+          /* @__PURE__ */ jsx5(
             "div",
             {
               className: "message-bubble",
               style: isBot ? styles.botMessageBubble : styles.userMessageBubble,
-              children: /* @__PURE__ */ jsx4(LinkifiedText, { text: msg.text })
+              children: /* @__PURE__ */ jsx5(LinkifiedText, { text: msg.text })
             }
           ),
-          /* @__PURE__ */ jsx4("div", { style: { ...styles.timeText, alignSelf: isBot ? "flex-start" : "flex-end" }, children: msg.time ?? nowTime() })
+          /* @__PURE__ */ jsx5("div", { style: { ...styles.timeText, alignSelf: isBot ? "flex-start" : "flex-end" }, children: msg.time ?? nowTime() })
         ] })
       ] }, msg.id ?? `local-${idx}`);
     }),
@@ -512,7 +563,7 @@ function MessageList({
       alignItems: "center",
       alignSelf: "flex-start"
     }, children: [
-      /* @__PURE__ */ jsx4("div", { className: "bot-avatar", "aria-hidden": true, children: /* @__PURE__ */ jsx4("img", { src: defaultAvatarSrc, alt: "" }) }),
+      /* @__PURE__ */ jsx5("div", { className: "bot-avatar", "aria-hidden": true, children: /* @__PURE__ */ jsx5("img", { src: defaultAvatarSrc, alt: "" }) }),
       /* @__PURE__ */ jsxs2("div", { style: {
         background: themeSettings?.isDarkMode ? "#383737ff" : "#d1e7e8",
         padding: "12px 16px",
@@ -521,21 +572,21 @@ function MessageList({
         color: "#4a5568"
       }, children: [
         /* @__PURE__ */ jsxs2("div", { style: { display: "flex", gap: 4 }, children: [
-          /* @__PURE__ */ jsx4("div", { style: {
+          /* @__PURE__ */ jsx5("div", { style: {
             width: 8,
             height: 8,
             borderRadius: "50%",
             background: themeSettings.isGradient ? `linear-gradient(90deg, ${themeSettings.primaryColor}, ${themeSettings.secondaryColor})` : themeSettings.primaryColor ?? "#006D77",
             animation: "pulse 1.4s ease-in-out infinite"
           } }),
-          /* @__PURE__ */ jsx4("div", { style: {
+          /* @__PURE__ */ jsx5("div", { style: {
             width: 8,
             height: 8,
             borderRadius: "50%",
             background: themeSettings.isGradient ? `linear-gradient(90deg, ${themeSettings.primaryColor}, ${themeSettings.secondaryColor})` : themeSettings.primaryColor ?? "#006D77",
             animation: "pulse 1.4s ease-in-out 0.2s infinite"
           } }),
-          /* @__PURE__ */ jsx4("div", { style: {
+          /* @__PURE__ */ jsx5("div", { style: {
             width: 8,
             height: 8,
             borderRadius: "50%",
@@ -543,17 +594,17 @@ function MessageList({
             animation: "pulse 1.4s ease-in-out 0.4s infinite"
           } })
         ] }),
-        /* @__PURE__ */ jsx4("div", { style: { ...styles.timeText, marginTop: 8 }, children: nowTime() })
+        /* @__PURE__ */ jsx5("div", { style: { ...styles.timeText, marginTop: 8 }, children: nowTime() })
       ] })
     ] }),
-    /* @__PURE__ */ jsx4("div", { ref: messagesEndRef })
+    /* @__PURE__ */ jsx5("div", { ref: messagesEndRef })
   ] });
 }
 
 // src/components/InputArea.tsx
 import { useEffect, useRef } from "react";
 import { Send as Send2 } from "lucide-react";
-import { jsx as jsx5, jsxs as jsxs3 } from "react/jsx-runtime";
+import { jsx as jsx6, jsxs as jsxs3 } from "react/jsx-runtime";
 var MAX_INPUT_HEIGHT_PX = 120;
 function InputArea({
   styles,
@@ -570,7 +621,7 @@ function InputArea({
     el.style.height = "auto";
     el.style.height = `${Math.min(el.scrollHeight, MAX_INPUT_HEIGHT_PX)}px`;
   }, [text]);
-  return /* @__PURE__ */ jsx5("div", { style: styles.inputArea, children: /* @__PURE__ */ jsx5(
+  return /* @__PURE__ */ jsx6("div", { style: styles.inputArea, children: /* @__PURE__ */ jsx6(
     "form",
     {
       onSubmit: (e) => {
@@ -585,7 +636,7 @@ function InputArea({
             alignItems: "flex-end"
           },
           children: [
-            /* @__PURE__ */ jsx5(
+            /* @__PURE__ */ jsx6(
               "textarea",
               {
                 ref: textareaRef,
@@ -637,7 +688,7 @@ function InputArea({
                   e.currentTarget.style.background = themeSettings?.isGradient ? `linear-gradient(90deg, ${themeSettings.primaryColor}, ${themeSettings.secondaryColor})` : themeSettings.primaryColor;
                 },
                 children: [
-                  /* @__PURE__ */ jsx5(Send2, { size: 18 }),
+                  /* @__PURE__ */ jsx6(Send2, { size: 18 }),
                   " Send"
                 ]
               }
@@ -650,7 +701,7 @@ function InputArea({
 }
 
 // src/components/ChatScreen.tsx
-import { jsx as jsx6, jsxs as jsxs4 } from "react/jsx-runtime";
+import { jsx as jsx7, jsxs as jsxs4 } from "react/jsx-runtime";
 function ChatScreen({
   styles,
   title,
@@ -666,12 +717,13 @@ function ChatScreen({
   canEscalate,
   onContactSupport,
   interactionLocked = false,
-  apiBaseUrl
+  apiBaseUrl,
+  onClose
 }) {
   return /* @__PURE__ */ jsxs4("div", { style: styles.chatScreen, children: [
-    /* @__PURE__ */ jsxs4("div", { style: styles.header, children: [
+    /* @__PURE__ */ jsxs4("div", { style: styles.header, className: "chat-widget-sheet-header", children: [
       /* @__PURE__ */ jsxs4("div", { style: { display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0 }, children: [
-        /* @__PURE__ */ jsx6(
+        /* @__PURE__ */ jsx7(
           "button",
           {
             type: "button",
@@ -696,11 +748,11 @@ function ChatScreen({
             onMouseLeave: (e) => {
               e.currentTarget.style.background = "transparent";
             },
-            children: /* @__PURE__ */ jsx6(ArrowLeft, { size: 20 })
+            children: /* @__PURE__ */ jsx7(ArrowLeft, { size: 20 })
           }
         ),
         /* @__PURE__ */ jsxs4("div", { style: { minWidth: 0 }, children: [
-          /* @__PURE__ */ jsx6(
+          /* @__PURE__ */ jsx7(
             "div",
             {
               style: {
@@ -710,7 +762,7 @@ function ChatScreen({
               children: title
             }
           ),
-          /* @__PURE__ */ jsx6(
+          /* @__PURE__ */ jsx7(
             "div",
             {
               style: {
@@ -722,28 +774,30 @@ function ChatScreen({
           )
         ] })
       ] }),
-      canEscalate && onContactSupport ? /* @__PURE__ */ jsx6(
-        "button",
-        {
-          type: "button",
-          onClick: onContactSupport,
-          style: {
-            flexShrink: 0,
-            marginLeft: 8,
-            background: "rgba(255,255,255,0.2)",
-            border: "1px solid rgba(255,255,255,0.5)",
-            color: "white",
-            borderRadius: 999,
-            padding: "8px 14px",
-            fontSize: 12,
-            fontWeight: 600,
-            cursor: "pointer"
-          },
-          children: "Contact support"
-        }
-      ) : null
+      /* @__PURE__ */ jsxs4("div", { style: { display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }, children: [
+        canEscalate && onContactSupport ? /* @__PURE__ */ jsx7(
+          "button",
+          {
+            type: "button",
+            onClick: onContactSupport,
+            style: {
+              flexShrink: 0,
+              background: "rgba(255,255,255,0.2)",
+              border: "1px solid rgba(255,255,255,0.5)",
+              color: "white",
+              borderRadius: 999,
+              padding: "8px 14px",
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: "pointer"
+            },
+            children: "Contact support"
+          }
+        ) : null,
+        onClose ? /* @__PURE__ */ jsx7(WidgetCloseButton, { onClose }) : null
+      ] })
     ] }),
-    /* @__PURE__ */ jsx6(
+    /* @__PURE__ */ jsx7(
       MessageList,
       {
         styles,
@@ -754,7 +808,7 @@ function ChatScreen({
         apiBaseUrl
       }
     ),
-    canEscalate && onContactSupport ? /* @__PURE__ */ jsx6(
+    canEscalate && onContactSupport ? /* @__PURE__ */ jsx7(
       "div",
       {
         style: {
@@ -763,7 +817,7 @@ function ChatScreen({
           textAlign: "center",
           background: themeSettings?.isDarkMode ? "#2b2b2b" : "#f8f8f8"
         },
-        children: /* @__PURE__ */ jsx6(
+        children: /* @__PURE__ */ jsx7(
           "button",
           {
             type: "button",
@@ -783,7 +837,7 @@ function ChatScreen({
         )
       }
     ) : null,
-    /* @__PURE__ */ jsx6(
+    /* @__PURE__ */ jsx7(
       InputArea,
       {
         styles,
@@ -799,7 +853,7 @@ function ChatScreen({
 
 // src/components/FaqListPanel.tsx
 import { ChevronRight as ChevronRight2, List as List2 } from "lucide-react";
-import { jsx as jsx7, jsxs as jsxs5 } from "react/jsx-runtime";
+import { jsx as jsx8, jsxs as jsxs5 } from "react/jsx-runtime";
 function FaqListPanel({
   styles,
   faqs,
@@ -830,8 +884,8 @@ function FaqListPanel({
               marginBottom: 12
             },
             children: [
-              /* @__PURE__ */ jsx7(List2, { size: 18, color: themeSettings.primaryColor ?? "#006D77" }),
-              /* @__PURE__ */ jsx7(
+              /* @__PURE__ */ jsx8(List2, { size: 18, color: themeSettings.primaryColor ?? "#006D77" }),
+              /* @__PURE__ */ jsx8(
                 "h3",
                 {
                   style: {
@@ -846,7 +900,7 @@ function FaqListPanel({
             ]
           }
         ),
-        faqs.length === 0 ? /* @__PURE__ */ jsx7(
+        faqs.length === 0 ? /* @__PURE__ */ jsx8(
           "p",
           {
             style: {
@@ -858,7 +912,7 @@ function FaqListPanel({
             },
             children: "No FAQs yet. Start a conversation and our team will help you."
           }
-        ) : /* @__PURE__ */ jsx7("div", { style: { display: "flex", flexDirection: "column", gap: 8 }, children: faqs.map((faq, index) => /* @__PURE__ */ jsx7(
+        ) : /* @__PURE__ */ jsx8("div", { style: { display: "flex", flexDirection: "column", gap: 8 }, children: faqs.map((faq, index) => /* @__PURE__ */ jsx8(
           "button",
           {
             type: "button",
@@ -886,7 +940,7 @@ function FaqListPanel({
                   gap: 8
                 },
                 children: [
-                  /* @__PURE__ */ jsx7(
+                  /* @__PURE__ */ jsx8(
                     "span",
                     {
                       style: {
@@ -898,7 +952,7 @@ function FaqListPanel({
                       children: faq.question
                     }
                   ),
-                  /* @__PURE__ */ jsx7(
+                  /* @__PURE__ */ jsx8(
                     ChevronRight2,
                     {
                       size: 18,
@@ -917,8 +971,8 @@ function FaqListPanel({
 }
 
 // src/components/HelpChip.tsx
-import { HelpCircle, X as X2 } from "lucide-react";
-import { jsx as jsx8, jsxs as jsxs6 } from "react/jsx-runtime";
+import { HelpCircle, X as X3 } from "lucide-react";
+import { jsx as jsx9, jsxs as jsxs6 } from "react/jsx-runtime";
 function HelpChip({ active, onClick, themeSettings, disabled = false }) {
   const primary = themeSettings.primaryColor ?? "#006D77";
   const isDark = themeSettings.isDarkMode;
@@ -951,7 +1005,7 @@ function HelpChip({ active, onClick, themeSettings, disabled = false }) {
         outline: "none"
       },
       children: [
-        active ? /* @__PURE__ */ jsx8(X2, { size: 16, "aria-hidden": true }) : /* @__PURE__ */ jsx8(HelpCircle, { size: 16, "aria-hidden": true }),
+        active ? /* @__PURE__ */ jsx9(X3, { size: 16, "aria-hidden": true }) : /* @__PURE__ */ jsx9(HelpCircle, { size: 16, "aria-hidden": true }),
         active ? "Back to chat" : "Quick help"
       ]
     }
@@ -960,7 +1014,7 @@ function HelpChip({ active, onClick, themeSettings, disabled = false }) {
 
 // src/components/ConversationRatingPrompt.tsx
 import { useState } from "react";
-import { jsx as jsx9, jsxs as jsxs7 } from "react/jsx-runtime";
+import { jsx as jsx10, jsxs as jsxs7 } from "react/jsx-runtime";
 function ConversationRatingPrompt({
   themeSettings,
   busy,
@@ -986,7 +1040,7 @@ function ConversationRatingPrompt({
         boxShadow: "0 4px 18px rgba(0,0,0,0.14), 0 1px 3px rgba(0,0,0,0.08)"
       },
       children: [
-        /* @__PURE__ */ jsx9(
+        /* @__PURE__ */ jsx10(
           "p",
           {
             style: {
@@ -999,7 +1053,7 @@ function ConversationRatingPrompt({
             children: "How was your conversation?"
           }
         ),
-        /* @__PURE__ */ jsx9(
+        /* @__PURE__ */ jsx10(
           "p",
           {
             style: {
@@ -1011,7 +1065,7 @@ function ConversationRatingPrompt({
             children: "Rate your experience after this chat has ended."
           }
         ),
-        /* @__PURE__ */ jsx9(
+        /* @__PURE__ */ jsx10(
           "div",
           {
             style: { display: "flex", alignItems: "center", gap: 6, marginBottom: 14 },
@@ -1019,7 +1073,7 @@ function ConversationRatingPrompt({
             "aria-label": "Rate your conversation from 1 to 5 stars",
             children: [1, 2, 3, 4, 5].map((star) => {
               const active = star <= (hovered || selected);
-              return /* @__PURE__ */ jsx9(
+              return /* @__PURE__ */ jsx10(
                 "button",
                 {
                   type: "button",
@@ -1047,7 +1101,7 @@ function ConversationRatingPrompt({
           }
         ),
         /* @__PURE__ */ jsxs7("div", { style: { display: "flex", gap: 8, justifyContent: "flex-end", alignItems: "center" }, children: [
-          /* @__PURE__ */ jsx9(
+          /* @__PURE__ */ jsx10(
             "button",
             {
               type: "button",
@@ -1065,7 +1119,7 @@ function ConversationRatingPrompt({
               children: "Skip"
             }
           ),
-          /* @__PURE__ */ jsx9(
+          /* @__PURE__ */ jsx10(
             "button",
             {
               type: "button",
@@ -1099,7 +1153,7 @@ function formatTicketId(id) {
 }
 
 // src/components/WelcomeMessagePanel.tsx
-import { jsx as jsx10, jsxs as jsxs8 } from "react/jsx-runtime";
+import { jsx as jsx11, jsxs as jsxs8 } from "react/jsx-runtime";
 function WelcomeMessagePanel({
   themeSettings,
   compact = false
@@ -1120,7 +1174,7 @@ function WelcomeMessagePanel({
         boxShadow: isDark ? "0 4px 16px rgba(0,0,0,0.25)" : "0 4px 16px rgba(0,0,0,0.08)"
       },
       children: [
-        /* @__PURE__ */ jsx10(
+        /* @__PURE__ */ jsx11(
           "div",
           {
             style: {
@@ -1132,7 +1186,7 @@ function WelcomeMessagePanel({
             children: headline
           }
         ),
-        subtitle ? /* @__PURE__ */ jsx10(
+        subtitle ? /* @__PURE__ */ jsx11(
           "p",
           {
             style: {
@@ -1224,7 +1278,7 @@ function withTicketCreatedNotice(thread, projectToken, ticketId, nowTime) {
 }
 
 // src/components/WidgetMainView.tsx
-import { Fragment as Fragment3, jsx as jsx11, jsxs as jsxs9 } from "react/jsx-runtime";
+import { Fragment as Fragment3, jsx as jsx12, jsxs as jsxs9 } from "react/jsx-runtime";
 function WidgetMainView({
   styles,
   title,
@@ -1247,6 +1301,7 @@ function WidgetMainView({
   resumableTicketId = null,
   onResumeTicket,
   onExitAgentChat,
+  onClose,
   ticketResolved = false,
   showRatingPrompt = false,
   ratingBusy = false,
@@ -1287,84 +1342,105 @@ function WidgetMainView({
     }
   };
   return /* @__PURE__ */ jsxs9("div", { style: styles.chatScreen, children: [
-    /* @__PURE__ */ jsxs9("div", { style: styles.header, children: [
-      /* @__PURE__ */ jsxs9("div", { style: { minWidth: 0, flex: 1 }, children: [
-        /* @__PURE__ */ jsx11(
-          "div",
-          {
-            style: {
-              fontWeight: 600,
-              fontSize: themeSettings?.fontSizeBase ? themeSettings.fontSizeBase / 2 + 4 : 16
-            },
-            children: title
-          }
-        ),
-        hasActiveTicket || !showWelcomePanel ? /* @__PURE__ */ jsx11(
-          "div",
-          {
-            style: {
-              fontSize: headerSubSize,
-              opacity: 0.9,
-              marginTop: 2,
-              lineHeight: 1.4
-            },
-            children: hasActiveTicket && activeTicketId ? `Ticket ${formatTicketId(activeTicketId)} \xB7 Status: ${formatVisitorTicketStatus(
-              ticketResolved ? "resolved" : ticketStatus
-            )}` : hasActiveTicket ? `Status: ${formatVisitorTicketStatus(
-              ticketResolved ? "resolved" : ticketStatus
-            )}` : subtitle || headline
-          }
-        ) : null
-      ] }),
-      hasActiveTicket && onExitAgentChat ? /* @__PURE__ */ jsx11(
-        "button",
-        {
-          type: "button",
-          onClick: onExitAgentChat,
-          disabled: interactionLocked,
-          style: {
-            flexShrink: 0,
-            background: "rgba(255,255,255,0.2)",
-            border: "1px solid rgba(255,255,255,0.5)",
-            color: "white",
-            borderRadius: 999,
-            padding: "8px 14px",
-            fontSize: headerSubSize,
-            fontWeight: 600,
-            cursor: interactionLocked ? "not-allowed" : "pointer",
-            opacity: interactionLocked ? 0.55 : 1
-          },
-          children: "Exit agent chat"
-        }
-      ) : null,
-      !hasActiveTicket && (canEscalate && onContactSupport || resumableTicketId && onResumeTicket) ? /* @__PURE__ */ jsx11(
-        "button",
-        {
-          type: "button",
-          onClick: () => {
-            if (resumableTicketId && onResumeTicket) {
-              onResumeTicket();
-              return;
+    /* @__PURE__ */ jsxs9(
+      "div",
+      {
+        style: styles.header,
+        className: "chat-widget-sheet-header",
+        children: [
+          /* @__PURE__ */ jsxs9("div", { style: { minWidth: 0, flex: 1 }, children: [
+            /* @__PURE__ */ jsx12(
+              "div",
+              {
+                style: {
+                  fontWeight: 600,
+                  fontSize: themeSettings?.fontSizeBase ? themeSettings.fontSizeBase / 2 + 4 : 16
+                },
+                children: title
+              }
+            ),
+            hasActiveTicket || !showWelcomePanel ? /* @__PURE__ */ jsx12(
+              "div",
+              {
+                style: {
+                  fontSize: headerSubSize,
+                  opacity: 0.9,
+                  marginTop: 2,
+                  lineHeight: 1.4
+                },
+                children: hasActiveTicket && activeTicketId ? `Ticket ${formatTicketId(activeTicketId)} \xB7 Status: ${formatVisitorTicketStatus(
+                  ticketResolved ? "resolved" : ticketStatus
+                )}` : hasActiveTicket ? `Status: ${formatVisitorTicketStatus(
+                  ticketResolved ? "resolved" : ticketStatus
+                )}` : subtitle || headline
+              }
+            ) : null
+          ] }),
+          /* @__PURE__ */ jsxs9(
+            "div",
+            {
+              style: {
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                flexShrink: 0
+              },
+              children: [
+                hasActiveTicket && onExitAgentChat ? /* @__PURE__ */ jsx12(
+                  "button",
+                  {
+                    type: "button",
+                    onClick: onExitAgentChat,
+                    disabled: interactionLocked,
+                    style: {
+                      flexShrink: 0,
+                      background: "rgba(255,255,255,0.2)",
+                      border: "1px solid rgba(255,255,255,0.5)",
+                      color: "white",
+                      borderRadius: 999,
+                      padding: "8px 14px",
+                      fontSize: headerSubSize,
+                      fontWeight: 600,
+                      cursor: interactionLocked ? "not-allowed" : "pointer",
+                      opacity: interactionLocked ? 0.55 : 1
+                    },
+                    children: "Exit agent chat"
+                  }
+                ) : null,
+                !hasActiveTicket && (canEscalate && onContactSupport || resumableTicketId && onResumeTicket) ? /* @__PURE__ */ jsx12(
+                  "button",
+                  {
+                    type: "button",
+                    onClick: () => {
+                      if (resumableTicketId && onResumeTicket) {
+                        onResumeTicket();
+                        return;
+                      }
+                      onContactSupport?.();
+                    },
+                    disabled: interactionLocked,
+                    style: {
+                      flexShrink: 0,
+                      background: "rgba(255,255,255,0.2)",
+                      border: "1px solid rgba(255,255,255,0.5)",
+                      color: "white",
+                      borderRadius: 999,
+                      padding: "8px 14px",
+                      fontSize: headerSubSize,
+                      fontWeight: 600,
+                      cursor: interactionLocked ? "not-allowed" : "pointer",
+                      opacity: interactionLocked ? 0.55 : 1
+                    },
+                    children: "Talk to agent"
+                  }
+                ) : null,
+                onClose ? /* @__PURE__ */ jsx12(WidgetCloseButton, { onClose }) : null
+              ]
             }
-            onContactSupport?.();
-          },
-          disabled: interactionLocked,
-          style: {
-            flexShrink: 0,
-            background: "rgba(255,255,255,0.2)",
-            border: "1px solid rgba(255,255,255,0.5)",
-            color: "white",
-            borderRadius: 999,
-            padding: "8px 14px",
-            fontSize: headerSubSize,
-            fontWeight: 600,
-            cursor: interactionLocked ? "not-allowed" : "pointer",
-            opacity: interactionLocked ? 0.55 : 1
-          },
-          children: "Talk to agent"
-        }
-      ) : null
-    ] }),
+          )
+        ]
+      }
+    ),
     /* @__PURE__ */ jsxs9(
       "div",
       {
@@ -1377,8 +1453,8 @@ function WidgetMainView({
           overflowY: "auto"
         },
         children: [
-          showWelcomePanel ? /* @__PURE__ */ jsx11(WelcomeMessagePanel, { themeSettings, compact: true }) : null,
-          showInlineFaqs ? /* @__PURE__ */ jsx11(
+          showWelcomePanel ? /* @__PURE__ */ jsx12(WelcomeMessagePanel, { themeSettings, compact: true }) : null,
+          showInlineFaqs ? /* @__PURE__ */ jsx12(
             FaqListPanel,
             {
               styles,
@@ -1389,7 +1465,7 @@ function WidgetMainView({
               compact: true
             }
           ) : /* @__PURE__ */ jsxs9(Fragment3, { children: [
-            /* @__PURE__ */ jsx11(
+            /* @__PURE__ */ jsx12(
               MessageList,
               {
                 styles: layoutStyles,
@@ -1401,7 +1477,7 @@ function WidgetMainView({
                 hideEmptyPlaceholder: showWelcomePanel
               }
             ),
-            showResolvedActions && ratingSubmitted ? /* @__PURE__ */ jsx11(
+            showResolvedActions && ratingSubmitted ? /* @__PURE__ */ jsx12(
               "p",
               {
                 style: {
@@ -1425,7 +1501,7 @@ function WidgetMainView({
                   alignItems: "center"
                 },
                 children: [
-                  !allowResolvedReply && onContinueResolvedConversation ? /* @__PURE__ */ jsx11(
+                  !allowResolvedReply && onContinueResolvedConversation ? /* @__PURE__ */ jsx12(
                     "button",
                     {
                       type: "button",
@@ -1443,7 +1519,7 @@ function WidgetMainView({
                       children: "Continue this conversation"
                     }
                   ) : null,
-                  onStartNewConversation ? /* @__PURE__ */ jsx11(
+                  onStartNewConversation ? /* @__PURE__ */ jsx12(
                     "button",
                     {
                       type: "button",
@@ -1465,7 +1541,7 @@ function WidgetMainView({
               }
             ) : null
           ] }),
-          helpOpen && !showInlineFaqs ? /* @__PURE__ */ jsx11(
+          helpOpen && !showInlineFaqs ? /* @__PURE__ */ jsx12(
             "div",
             {
               style: {
@@ -1477,7 +1553,7 @@ function WidgetMainView({
                 background: isDark ? "#2b2b2b" : "#f8f8f8",
                 boxShadow: isDark ? "0 -4px 24px rgba(0,0,0,0.45)" : "0 -4px 24px rgba(0,0,0,0.08)"
               },
-              children: /* @__PURE__ */ jsx11(
+              children: /* @__PURE__ */ jsx12(
                 FaqListPanel,
                 {
                   styles,
@@ -1503,7 +1579,7 @@ function WidgetMainView({
           padding: "10px 16px 0"
         },
         children: [
-          showRatingPrompt && onRatingSubmit && onRatingSkip ? /* @__PURE__ */ jsx11(
+          showRatingPrompt && onRatingSubmit && onRatingSkip ? /* @__PURE__ */ jsx12(
             ConversationRatingPrompt,
             {
               themeSettings,
@@ -1512,7 +1588,7 @@ function WidgetMainView({
               onSkip: onRatingSkip
             }
           ) : null,
-          /* @__PURE__ */ jsx11("div", { style: { marginBottom: showComposer && !helpOpen ? 10 : 0 }, children: showHelpChip ? /* @__PURE__ */ jsx11(
+          /* @__PURE__ */ jsx12("div", { style: { marginBottom: showComposer && !helpOpen ? 10 : 0 }, children: showHelpChip ? /* @__PURE__ */ jsx12(
             HelpChip,
             {
               active: helpOpen,
@@ -1521,7 +1597,7 @@ function WidgetMainView({
               themeSettings
             }
           ) : null }),
-          showComposer && !helpOpen ? /* @__PURE__ */ jsx11(
+          showComposer && !helpOpen ? /* @__PURE__ */ jsx12(
             InputArea,
             {
               styles: layoutStyles,
@@ -1531,7 +1607,7 @@ function WidgetMainView({
               loading: Boolean(showTyping || sending || interactionLocked),
               themeSettings
             }
-          ) : helpOpen ? /* @__PURE__ */ jsx11("div", { style: { height: 16 }, "aria-hidden": true }) : /* @__PURE__ */ jsx11("div", { style: { height: 8 }, "aria-hidden": true })
+          ) : helpOpen ? /* @__PURE__ */ jsx12("div", { style: { height: 16 }, "aria-hidden": true }) : /* @__PURE__ */ jsx12("div", { style: { height: 8 }, "aria-hidden": true })
         ]
       }
     )
@@ -1549,13 +1625,14 @@ var INVALID_EMAIL_MESSAGE = "Please enter a valid email address";
 var REQUIRED_EMAIL_MESSAGE = "Email is required";
 
 // src/components/PreChatScreen.tsx
-import { jsx as jsx12, jsxs as jsxs10 } from "react/jsx-runtime";
+import { jsx as jsx13, jsxs as jsxs10 } from "react/jsx-runtime";
 function PreChatScreen({
   styles,
   themeSettings,
   onContinue,
   busy,
-  error
+  error,
+  onClose
 }) {
   const [name, setName] = useState2("");
   const [email, setEmail] = useState2("");
@@ -1565,34 +1642,49 @@ function PreChatScreen({
   const bodyFontSize = headerFontSize / 2;
   const shownError = localError || error || null;
   return /* @__PURE__ */ jsxs10("div", { style: styles.welcomeScreen, children: [
-    /* @__PURE__ */ jsx12("div", { style: styles.welcomeHeader, className: "chat-widget-welcome-header", children: /* @__PURE__ */ jsxs10("div", { style: { position: "relative", zIndex: 1 }, children: [
-      /* @__PURE__ */ jsx12(
-        "h2",
-        {
-          style: {
-            margin: 0,
-            fontSize: headerFontSize,
-            fontWeight: 700,
-            marginBottom: 8
-          },
-          children: headline
-        }
-      ),
-      subtitle ? /* @__PURE__ */ jsx12(
-        "p",
-        {
-          style: {
-            margin: 0,
-            fontSize: bodyFontSize,
-            opacity: 0.95,
-            lineHeight: 1.5,
-            whiteSpace: "pre-wrap"
-          },
-          children: subtitle
-        }
-      ) : null
-    ] }) }),
-    /* @__PURE__ */ jsx12(
+    /* @__PURE__ */ jsx13("div", { style: styles.welcomeHeader, className: "chat-widget-welcome-header", children: /* @__PURE__ */ jsxs10(
+      "div",
+      {
+        style: {
+          position: "relative",
+          zIndex: 1,
+          display: "flex",
+          alignItems: "flex-start",
+          gap: 12
+        },
+        children: [
+          /* @__PURE__ */ jsxs10("div", { style: { flex: 1, minWidth: 0 }, children: [
+            /* @__PURE__ */ jsx13(
+              "h2",
+              {
+                style: {
+                  margin: 0,
+                  fontSize: headerFontSize,
+                  fontWeight: 700,
+                  marginBottom: 8
+                },
+                children: headline
+              }
+            ),
+            subtitle ? /* @__PURE__ */ jsx13(
+              "p",
+              {
+                style: {
+                  margin: 0,
+                  fontSize: bodyFontSize,
+                  opacity: 0.95,
+                  lineHeight: 1.5,
+                  whiteSpace: "pre-wrap"
+                },
+                children: subtitle
+              }
+            ) : null
+          ] }),
+          onClose ? /* @__PURE__ */ jsx13(WidgetCloseButton, { onClose }) : null
+        ]
+      }
+    ) }),
+    /* @__PURE__ */ jsx13(
       "div",
       {
         className: "chat-widget-prechat-body",
@@ -1605,7 +1697,7 @@ function PreChatScreen({
           padding: "0 24px 24px",
           boxSizing: "border-box"
         },
-        children: /* @__PURE__ */ jsx12("div", { style: styles.faqContainer, className: "chat-widget-faq-container", children: /* @__PURE__ */ jsxs10(
+        children: /* @__PURE__ */ jsx13("div", { style: styles.faqContainer, className: "chat-widget-faq-container", children: /* @__PURE__ */ jsxs10(
           "form",
           {
             onSubmit: async (e) => {
@@ -1624,8 +1716,8 @@ function PreChatScreen({
             },
             children: [
               /* @__PURE__ */ jsxs10("div", { style: { marginBottom: 12 }, children: [
-                /* @__PURE__ */ jsx12("label", { style: styles.formLabel, children: "Name" }),
-                /* @__PURE__ */ jsx12(
+                /* @__PURE__ */ jsx13("label", { style: styles.formLabel, children: "Name" }),
+                /* @__PURE__ */ jsx13(
                   "input",
                   {
                     className: "chat-widget-form-input",
@@ -1638,8 +1730,8 @@ function PreChatScreen({
                 )
               ] }),
               /* @__PURE__ */ jsxs10("div", { style: { marginBottom: 16 }, children: [
-                /* @__PURE__ */ jsx12("label", { style: styles.formLabel, children: "Email" }),
-                /* @__PURE__ */ jsx12(
+                /* @__PURE__ */ jsx13("label", { style: styles.formLabel, children: "Email" }),
+                /* @__PURE__ */ jsx13(
                   "input",
                   {
                     className: "chat-widget-form-input",
@@ -1656,7 +1748,7 @@ function PreChatScreen({
                   }
                 )
               ] }),
-              shownError ? /* @__PURE__ */ jsx12(
+              shownError ? /* @__PURE__ */ jsx13(
                 "p",
                 {
                   role: "alert",
@@ -1669,7 +1761,7 @@ function PreChatScreen({
                   children: shownError
                 }
               ) : null,
-              /* @__PURE__ */ jsx12("div", { style: { display: "flex", justifyContent: "flex-end" }, children: /* @__PURE__ */ jsx12(
+              /* @__PURE__ */ jsx13("div", { style: { display: "flex", justifyContent: "flex-end" }, children: /* @__PURE__ */ jsx13(
                 "button",
                 {
                   type: "submit",
@@ -1693,7 +1785,7 @@ function PreChatScreen({
 // src/components/EscalateScreen.tsx
 import { useState as useState3 } from "react";
 import { ArrowLeft as ArrowLeft2 } from "lucide-react";
-import { Fragment as Fragment4, jsx as jsx13, jsxs as jsxs11 } from "react/jsx-runtime";
+import { Fragment as Fragment4, jsx as jsx14, jsxs as jsxs11 } from "react/jsx-runtime";
 function EscalateScreen({
   styles,
   themeSettings,
@@ -1704,7 +1796,8 @@ function EscalateScreen({
   collectIdentity,
   initialEmail,
   initialName,
-  initialSummary
+  initialSummary,
+  onClose
 }) {
   const [subject, setSubject] = useState3("");
   const [summary, setSummary] = useState3(initialSummary ?? "");
@@ -1715,49 +1808,52 @@ function EscalateScreen({
   const headerSubSize = widgetHeaderSubFontSize(themeSettings.fontSizeBase);
   const canSubmit = !busy && subject.trim().length >= 3 && summary.trim().length >= 3 && (!collectIdentity || Boolean(email.trim()));
   return /* @__PURE__ */ jsxs11("div", { style: styles.chatScreen, children: [
-    /* @__PURE__ */ jsx13("div", { style: styles.header, children: /* @__PURE__ */ jsxs11("div", { style: { display: "flex", alignItems: "center", gap: 12 }, children: [
-      /* @__PURE__ */ jsx13(
-        "button",
-        {
-          type: "button",
-          onClick: onBack,
-          style: {
-            background: "transparent",
-            border: "none",
-            color: "white",
-            cursor: "pointer",
-            borderRadius: 8,
-            padding: 8,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center"
-          },
-          children: /* @__PURE__ */ jsx13(ArrowLeft2, { size: 20 })
-        }
-      ),
-      /* @__PURE__ */ jsxs11("div", { children: [
-        /* @__PURE__ */ jsx13(
-          "div",
+    /* @__PURE__ */ jsxs11("div", { style: styles.header, className: "chat-widget-sheet-header", children: [
+      /* @__PURE__ */ jsxs11("div", { style: { display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0 }, children: [
+        /* @__PURE__ */ jsx14(
+          "button",
           {
+            type: "button",
+            onClick: onBack,
             style: {
-              fontWeight: 600,
-              fontSize: themeSettings?.fontSizeBase ? themeSettings.fontSizeBase / 2 + 4 : 16
+              background: "transparent",
+              border: "none",
+              color: "white",
+              cursor: "pointer",
+              borderRadius: 8,
+              padding: 8,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center"
             },
-            children: title
+            children: /* @__PURE__ */ jsx14(ArrowLeft2, { size: 20 })
           }
         ),
-        /* @__PURE__ */ jsx13(
-          "div",
-          {
-            style: {
-              fontSize: headerSubSize,
-              opacity: 0.9
-            },
-            children: "Contact support"
-          }
-        )
-      ] })
-    ] }) }),
+        /* @__PURE__ */ jsxs11("div", { style: { minWidth: 0 }, children: [
+          /* @__PURE__ */ jsx14(
+            "div",
+            {
+              style: {
+                fontWeight: 600,
+                fontSize: themeSettings?.fontSizeBase ? themeSettings.fontSizeBase / 2 + 4 : 16
+              },
+              children: title
+            }
+          ),
+          /* @__PURE__ */ jsx14(
+            "div",
+            {
+              style: {
+                fontSize: headerSubSize,
+                opacity: 0.9
+              },
+              children: "Contact support"
+            }
+          )
+        ] })
+      ] }),
+      onClose ? /* @__PURE__ */ jsx14(WidgetCloseButton, { onClose }) : null
+    ] }),
     /* @__PURE__ */ jsxs11(
       "div",
       {
@@ -1768,7 +1864,7 @@ function EscalateScreen({
           color: themeSettings?.isDarkMode ? "#f1f5f9" : "#1e293b"
         },
         children: [
-          /* @__PURE__ */ jsx13(
+          /* @__PURE__ */ jsx14(
             "p",
             {
               style: {
@@ -1781,8 +1877,8 @@ function EscalateScreen({
           ),
           collectIdentity ? /* @__PURE__ */ jsxs11(Fragment4, { children: [
             /* @__PURE__ */ jsxs11("div", { style: { marginBottom: 10 }, children: [
-              /* @__PURE__ */ jsx13("label", { style: styles.formLabel, children: "Name (optional)" }),
-              /* @__PURE__ */ jsx13(
+              /* @__PURE__ */ jsx14("label", { style: styles.formLabel, children: "Name (optional)" }),
+              /* @__PURE__ */ jsx14(
                 "input",
                 {
                   value: name,
@@ -1794,8 +1890,8 @@ function EscalateScreen({
               )
             ] }),
             /* @__PURE__ */ jsxs11("div", { style: { marginBottom: 10 }, children: [
-              /* @__PURE__ */ jsx13("label", { style: styles.formLabel, children: "Email Address" }),
-              /* @__PURE__ */ jsx13(
+              /* @__PURE__ */ jsx14("label", { style: styles.formLabel, children: "Email Address" }),
+              /* @__PURE__ */ jsx14(
                 "input",
                 {
                   type: "email",
@@ -1813,8 +1909,8 @@ function EscalateScreen({
             ] })
           ] }) : null,
           /* @__PURE__ */ jsxs11("div", { style: { marginBottom: 10 }, children: [
-            /* @__PURE__ */ jsx13("label", { style: styles.formLabel, children: "Subject" }),
-            /* @__PURE__ */ jsx13(
+            /* @__PURE__ */ jsx14("label", { style: styles.formLabel, children: "Subject" }),
+            /* @__PURE__ */ jsx14(
               "input",
               {
                 value: subject,
@@ -1827,8 +1923,8 @@ function EscalateScreen({
             )
           ] }),
           /* @__PURE__ */ jsxs11("div", { style: { marginBottom: 4 }, children: [
-            /* @__PURE__ */ jsx13("label", { style: styles.formLabel, children: "Query" }),
-            /* @__PURE__ */ jsx13(
+            /* @__PURE__ */ jsx14("label", { style: styles.formLabel, children: "Query" }),
+            /* @__PURE__ */ jsx14(
               "textarea",
               {
                 value: summary,
@@ -1846,7 +1942,7 @@ function EscalateScreen({
               }
             )
           ] }),
-          localError ? /* @__PURE__ */ jsx13(
+          localError ? /* @__PURE__ */ jsx14(
             "p",
             {
               role: "alert",
@@ -1859,7 +1955,7 @@ function EscalateScreen({
               children: localError
             }
           ) : null,
-          /* @__PURE__ */ jsx13("div", { style: { marginTop: 16, display: "flex", justifyContent: "flex-end" }, children: /* @__PURE__ */ jsx13(
+          /* @__PURE__ */ jsx14("div", { style: { marginTop: 16, display: "flex", justifyContent: "flex-end" }, children: /* @__PURE__ */ jsx14(
             "button",
             {
               type: "button",
@@ -2597,7 +2693,7 @@ function hasWidgetApiBase(apiBaseUrl) {
 }
 
 // src/ChatWidget.tsx
-import { Fragment as Fragment5, jsx as jsx14, jsxs as jsxs12 } from "react/jsx-runtime";
+import { Fragment as Fragment5, jsx as jsx15, jsxs as jsxs12 } from "react/jsx-runtime";
 function ChatWidget({
   title = "AI Chatbot",
   faqs: faqsProp,
@@ -2947,6 +3043,9 @@ function ChatWidget({
   useEffect2(() => {
     function onDocClick(e) {
       if (!open) return;
+      if (typeof window !== "undefined" && window.matchMedia("(max-width: 640px)").matches) {
+        return;
+      }
       if (!panelRef.current) return;
       if (!panelRef.current.contains(e.target)) {
         setOpen(false);
@@ -2963,6 +3062,15 @@ function ChatWidget({
     document.addEventListener("mousedown", onDocClick);
     return () => document.removeEventListener("mousedown", onDocClick);
   }, [open, visitorGateEffective]);
+  useEffect2(() => {
+    if (!open || typeof window === "undefined") return;
+    if (!window.matchMedia("(max-width: 640px)").matches) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
   useEffect2(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, awaitingBot]);
@@ -3548,7 +3656,7 @@ function ChatWidget({
     return null;
   }
   return /* @__PURE__ */ jsxs12(Fragment5, { children: [
-    /* @__PURE__ */ jsx14("style", { children: `
+    /* @__PURE__ */ jsx15("style", { children: `
         .hide-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .message-row { display:flex; align-items:flex-end; gap:8px; }
@@ -3599,52 +3707,67 @@ function ChatWidget({
           font-size: ${formFontSize}px !important;
           line-height: 1.5;
         }
-        @media (max-width: 768px), (max-height: 720px) {
+        /* Phones only \u2014 tablets (e.g. 768px) keep the floating popup */
+        @media (max-width: 640px) {
           .chat-panel {
-            left: 12px !important;
-            right: 12px !important;
-            width: auto !important;
+            top: 0 !important;
+            right: 0 !important;
+            bottom: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            width: 100dvw !important;
             max-width: none !important;
-            height: auto !important;
+            height: 100% !important;
+            height: 100dvh !important;
             max-height: none !important;
-            border-radius: 16px !important;
+            border-radius: 0 !important;
+            box-shadow: none !important;
           }
           .chat-panel.chat-pos-br,
-          .chat-panel.chat-pos-bl {
-            top: calc(env(safe-area-inset-top, 0px) + 24px) !important;
-            bottom: 88px !important;
-          }
+          .chat-panel.chat-pos-bl,
           .chat-panel.chat-pos-tr,
           .chat-panel.chat-pos-tl {
-            top: 88px !important;
-            bottom: calc(env(safe-area-inset-bottom, 0px) + 24px) !important;
+            top: 0 !important;
+            right: 0 !important;
+            bottom: 0 !important;
+            left: 0 !important;
+          }
+          .chat-widget-sheet-header,
+          .chat-widget-welcome-header {
+            border-radius: 0 !important;
+            border-top-left-radius: 0 !important;
+            border-top-right-radius: 0 !important;
+          }
+          /* Close lives in the header on phones \u2014 hide the floating launcher while open */
+          .chat-widget-floating-btn.is-open {
+            display: none !important;
           }
           .chat-widget-floating-btn {
-            width: 48px !important;
-            height: 48px !important;
+            width: 56px !important;
+            height: 56px !important;
           }
           .chat-widget-floating-btn svg {
-            width: 22px !important;
-            height: 22px !important;
+            width: 24px !important;
+            height: 24px !important;
           }
           .chat-widget-floating-btn.chat-pos-br,
           .chat-widget-floating-btn.chat-pos-tr {
-            right: 20px !important;
+            right: max(16px, env(safe-area-inset-right, 0px)) !important;
             left: auto !important;
           }
           .chat-widget-floating-btn.chat-pos-bl,
           .chat-widget-floating-btn.chat-pos-tl {
-            left: 20px !important;
+            left: max(16px, env(safe-area-inset-left, 0px)) !important;
             right: auto !important;
           }
           .chat-widget-floating-btn.chat-pos-br,
           .chat-widget-floating-btn.chat-pos-bl {
-            bottom: 20px !important;
+            bottom: max(16px, env(safe-area-inset-bottom, 0px)) !important;
             top: auto !important;
           }
           .chat-widget-floating-btn.chat-pos-tr,
           .chat-widget-floating-btn.chat-pos-tl {
-            top: 20px !important;
+            top: max(16px, env(safe-area-inset-top, 0px)) !important;
             bottom: auto !important;
           }
           .chat-widget-welcome-header {
@@ -3665,15 +3788,36 @@ function ChatWidget({
             padding: 20px !important;
           }
         }
+        @media (min-width: 641px) and (max-height: 720px) {
+          .chat-panel {
+            left: 12px !important;
+            right: 12px !important;
+            width: auto !important;
+            max-width: none !important;
+            height: auto !important;
+            max-height: none !important;
+            border-radius: 16px !important;
+          }
+          .chat-panel.chat-pos-br,
+          .chat-panel.chat-pos-bl {
+            top: calc(env(safe-area-inset-top, 0px) + 24px) !important;
+            bottom: 88px !important;
+          }
+          .chat-panel.chat-pos-tr,
+          .chat-panel.chat-pos-tl {
+            top: 88px !important;
+            bottom: calc(env(safe-area-inset-bottom, 0px) + 24px) !important;
+          }
+        }
       ` }),
-    /* @__PURE__ */ jsx14(
+    /* @__PURE__ */ jsx15(
       FloatingButton,
       {
         open,
         setOpen,
         styles,
         themeSettings,
-        className: `chat-widget-floating-btn chat-pos-${positionClass}`
+        className: `chat-widget-floating-btn chat-pos-${positionClass}${open ? " is-open" : ""}`
       }
     ),
     /* @__PURE__ */ jsxs12(
@@ -3684,17 +3828,18 @@ function ChatWidget({
         "data-theme": themeSettings.isDarkMode ? "dark" : "light",
         className: `chat-panel chat-pos-${positionClass}`,
         children: [
-          view === "prechat" && /* @__PURE__ */ jsx14("div", { style: { display: "flex", flexDirection: "column", flex: 1, width: "100%" }, children: /* @__PURE__ */ jsx14(
+          view === "prechat" && /* @__PURE__ */ jsx15("div", { style: { display: "flex", flexDirection: "column", flex: 1, width: "100%" }, children: /* @__PURE__ */ jsx15(
             PreChatScreen,
             {
               styles,
               themeSettings,
               onContinue: onPreChatContinue,
               busy: prechatBusy,
-              error: prechatError
+              error: prechatError,
+              onClose: () => setOpen(false)
             }
           ) }),
-          view === "main" && visitorGateEffective ? /* @__PURE__ */ jsx14(
+          view === "main" && visitorGateEffective ? /* @__PURE__ */ jsx15(
             WidgetMainView,
             {
               styles,
@@ -3718,6 +3863,7 @@ function ChatWidget({
               resumableTicketId,
               onResumeTicket: () => void handleResumeTicket(),
               onExitAgentChat: handleExitAgentChat,
+              onClose: () => setOpen(false),
               ticketResolved: viewingTicketThread && ticketResolved,
               showRatingPrompt: viewingTicketThread && showRatingPrompt,
               ratingBusy,
@@ -3734,7 +3880,7 @@ function ChatWidget({
               apiBaseUrl: apiBase
             }
           ) : null,
-          view === "welcome" && !visitorGateEffective ? /* @__PURE__ */ jsx14(
+          view === "welcome" && !visitorGateEffective ? /* @__PURE__ */ jsx15(
             WelcomeScreen,
             {
               styles,
@@ -3751,10 +3897,11 @@ function ChatWidget({
               },
               themeSettings,
               canEscalate,
-              onCreateSupportTicket: () => setView("escalate")
+              onCreateSupportTicket: () => setView("escalate"),
+              onClose: () => setOpen(false)
             }
           ) : null,
-          view === "chat" && !visitorGateEffective ? /* @__PURE__ */ jsx14(
+          view === "chat" && !visitorGateEffective ? /* @__PURE__ */ jsx15(
             ChatScreen,
             {
               styles,
@@ -3771,10 +3918,11 @@ function ChatWidget({
               themeSettings,
               canEscalate,
               onContactSupport: () => setView("escalate"),
-              apiBaseUrl: apiBase
+              apiBaseUrl: apiBase,
+              onClose: () => setOpen(false)
             }
           ) : null,
-          view === "escalate" && /* @__PURE__ */ jsx14(
+          view === "escalate" && /* @__PURE__ */ jsx15(
             EscalateScreen,
             {
               styles,
@@ -3789,7 +3937,8 @@ function ChatWidget({
               collectIdentity: collectIdentityOnEscalate,
               initialEmail: visitor?.email,
               initialName: visitor?.name,
-              initialSummary: lastUserMessageForEscalate(messages)
+              initialSummary: lastUserMessageForEscalate(messages),
+              onClose: () => setOpen(false)
             }
           )
         ]

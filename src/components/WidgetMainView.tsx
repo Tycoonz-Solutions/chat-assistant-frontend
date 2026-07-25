@@ -4,6 +4,7 @@ import InputArea from "./InputArea";
 import FaqListPanel from "./FaqListPanel";
 import HelpChip from "./HelpChip";
 import ConversationRatingPrompt from "./ConversationRatingPrompt";
+import WidgetCloseButton from "./WidgetCloseButton";
 import type { FAQ, Msg, ThemeSettings } from "../../types";
 import { formatTicketId } from "../lib/formatTicketId";
 import WelcomeMessagePanel from "./WelcomeMessagePanel";
@@ -38,6 +39,8 @@ type Props = {
   onResumeTicket?: () => void;
   /** Leave live-agent mode; keep the same message timeline and chat with FAQ/AI again. */
   onExitAgentChat?: () => void;
+  /** Close the whole widget (used on mobile full-screen). */
+  onClose?: () => void;
   ticketResolved?: boolean;
   showRatingPrompt?: boolean;
   ratingBusy?: boolean;
@@ -76,6 +79,7 @@ export default function WidgetMainView({
   resumableTicketId = null,
   onResumeTicket,
   onExitAgentChat,
+  onClose,
   ticketResolved = false,
   showRatingPrompt = false,
   ratingBusy = false,
@@ -129,7 +133,10 @@ export default function WidgetMainView({
 
   return (
     <div style={styles.chatScreen}>
-      <div style={styles.header as React.CSSProperties}>
+      <div
+        style={styles.header as React.CSSProperties}
+        className="chat-widget-sheet-header"
+      >
         <div style={{ minWidth: 0, flex: 1 }}>
           <div
             style={{
@@ -162,56 +169,66 @@ export default function WidgetMainView({
             </div>
           ) : null}
         </div>
-        {hasActiveTicket && onExitAgentChat ? (
-          <button
-            type="button"
-            onClick={onExitAgentChat}
-            disabled={interactionLocked}
-            style={{
-              flexShrink: 0,
-              background: "rgba(255,255,255,0.2)",
-              border: "1px solid rgba(255,255,255,0.5)",
-              color: "white",
-              borderRadius: 999,
-              padding: "8px 14px",
-              fontSize: headerSubSize,
-              fontWeight: 600,
-              cursor: interactionLocked ? "not-allowed" : "pointer",
-              opacity: interactionLocked ? 0.55 : 1,
-            }}
-          >
-            Exit agent chat
-          </button>
-        ) : null}
-        {!hasActiveTicket &&
-        ((canEscalate && onContactSupport) ||
-          (resumableTicketId && onResumeTicket)) ? (
-          <button
-            type="button"
-            onClick={() => {
-              if (resumableTicketId && onResumeTicket) {
-                onResumeTicket();
-                return;
-              }
-              onContactSupport?.();
-            }}
-            disabled={interactionLocked}
-            style={{
-              flexShrink: 0,
-              background: "rgba(255,255,255,0.2)",
-              border: "1px solid rgba(255,255,255,0.5)",
-              color: "white",
-              borderRadius: 999,
-              padding: "8px 14px",
-              fontSize: headerSubSize,
-              fontWeight: 600,
-              cursor: interactionLocked ? "not-allowed" : "pointer",
-              opacity: interactionLocked ? 0.55 : 1,
-            }}
-          >
-            Talk to agent
-          </button>
-        ) : null}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            flexShrink: 0,
+          }}
+        >
+          {hasActiveTicket && onExitAgentChat ? (
+            <button
+              type="button"
+              onClick={onExitAgentChat}
+              disabled={interactionLocked}
+              style={{
+                flexShrink: 0,
+                background: "rgba(255,255,255,0.2)",
+                border: "1px solid rgba(255,255,255,0.5)",
+                color: "white",
+                borderRadius: 999,
+                padding: "8px 14px",
+                fontSize: headerSubSize,
+                fontWeight: 600,
+                cursor: interactionLocked ? "not-allowed" : "pointer",
+                opacity: interactionLocked ? 0.55 : 1,
+              }}
+            >
+              Exit agent chat
+            </button>
+          ) : null}
+          {!hasActiveTicket &&
+          ((canEscalate && onContactSupport) ||
+            (resumableTicketId && onResumeTicket)) ? (
+            <button
+              type="button"
+              onClick={() => {
+                if (resumableTicketId && onResumeTicket) {
+                  onResumeTicket();
+                  return;
+                }
+                onContactSupport?.();
+              }}
+              disabled={interactionLocked}
+              style={{
+                flexShrink: 0,
+                background: "rgba(255,255,255,0.2)",
+                border: "1px solid rgba(255,255,255,0.5)",
+                color: "white",
+                borderRadius: 999,
+                padding: "8px 14px",
+                fontSize: headerSubSize,
+                fontWeight: 600,
+                cursor: interactionLocked ? "not-allowed" : "pointer",
+                opacity: interactionLocked ? 0.55 : 1,
+              }}
+            >
+              Talk to agent
+            </button>
+          ) : null}
+          {onClose ? <WidgetCloseButton onClose={onClose} /> : null}
+        </div>
       </div>
 
       <div
