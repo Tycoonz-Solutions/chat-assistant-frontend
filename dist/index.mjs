@@ -2011,15 +2011,6 @@ function buildEscalateTranscript(messages) {
     ...m.sortAt ? { at: m.sortAt } : {}
   }));
 }
-function lastUserMessageForEscalate(messages) {
-  for (let i = messages.length - 1; i >= 0; i -= 1) {
-    const m = messages[i];
-    if (m.role === "user" && !m.faqLocal && m.text.trim()) {
-      return m.text.trim();
-    }
-  }
-  return "";
-}
 
 // src/lib/chat-backend.ts
 function assertCompleteJwt(token, label = "Token") {
@@ -2456,20 +2447,13 @@ function lastAgentModeNotice(messages) {
   }
   return null;
 }
-function appendSystemNotice(messages, text) {
-  const trimmed = text.trim();
-  if (!trimmed) return messages;
-  if (messages.some(
-    (m) => m.isSystem && String(m.text || "").trim() === trimmed
-  )) {
-    return messages;
-  }
+function pushSystemNotice(messages, text) {
   const sortAt = (/* @__PURE__ */ new Date()).toISOString();
   return [
     ...messages,
     {
       role: "bot",
-      text: trimmed,
+      text,
       time: (/* @__PURE__ */ new Date()).toLocaleTimeString([], {
         hour: "2-digit",
         minute: "2-digit"
@@ -2479,6 +2463,24 @@ function appendSystemNotice(messages, text) {
       localOnly: true
     }
   ];
+}
+function appendSystemNotice(messages, text) {
+  const trimmed = text.trim();
+  if (!trimmed) return messages;
+  if (trimmed === AGENT_ENTER_NOTICE) {
+    if (lastAgentModeNotice(messages) === "enter") return messages;
+    return pushSystemNotice(messages, trimmed);
+  }
+  if (trimmed === AGENT_EXIT_NOTICE) {
+    if (lastAgentModeNotice(messages) === "exit") return messages;
+    return pushSystemNotice(messages, trimmed);
+  }
+  if (messages.some(
+    (m) => m.isSystem && String(m.text || "").trim() === trimmed
+  )) {
+    return messages;
+  }
+  return pushSystemNotice(messages, trimmed);
 }
 
 // src/lib/faq-transcript.ts
@@ -3977,7 +3979,6 @@ function ChatWidget({
               collectIdentity: collectIdentityOnEscalate,
               initialEmail: visitor?.email,
               initialName: visitor?.name,
-              initialSummary: lastUserMessageForEscalate(messages),
               onClose: () => setOpen(false)
             }
           )
