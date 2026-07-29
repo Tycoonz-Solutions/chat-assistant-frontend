@@ -151,6 +151,20 @@ export function mergeLocalIntoTicketThread(
 export const AGENT_ENTER_NOTICE = "You've reached our customer support agent";
 export const AGENT_EXIT_NOTICE = "You've left customer support";
 
+/** Last enter/exit divider in the local timeline (ignores other system rows). */
+export function lastAgentModeNotice(
+  messages: Msg[],
+): "enter" | "exit" | null {
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const m = messages[i];
+    if (!m?.isSystem) continue;
+    const text = String(m.text || "").trim();
+    if (text === AGENT_ENTER_NOTICE) return "enter";
+    if (text === AGENT_EXIT_NOTICE) return "exit";
+  }
+  return null;
+}
+
 /** Append a centered system divider at the end of the timeline (skip if already in thread). */
 export function appendSystemNotice(messages: Msg[], text: string): Msg[] {
   const trimmed = text.trim();

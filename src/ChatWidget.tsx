@@ -37,6 +37,7 @@ import {
   AGENT_EXIT_NOTICE,
   appendSystemNotice,
   buildVisitorThread,
+  lastAgentModeNotice,
   mergeLocalIntoTicketThread,
   ticketMessageToWidgetMsg,
 } from "./lib/ticket-thread-ui";
@@ -376,7 +377,8 @@ export default function ChatWidget({
       setVisitor(profile);
       visitorRef.current = profile;
       saveVisitorSession(profile, projectToken);
-      // Land on FAQ / AI home unless this ticket still needs a rating.
+      // Land on FAQ / AI home unless this ticket still needs a rating, or the
+      // visitor never exited agent chat (enter notice still the latest mode).
       setInTicketThread(false);
       const restored = loadSelfServeTranscript(projectToken, profile.email);
       setMessages(restored);
@@ -392,7 +394,10 @@ export default function ChatWidget({
           );
           if (cancelled) return;
           setTicketSummary(summary);
-          if (summary.canRate) {
+          const stillInAgentMode =
+            summary.status !== "resolved" &&
+            lastAgentModeNotice(restored) === "enter";
+          if (summary.canRate || stillInAgentMode) {
             setRatingSkipped(false);
             setInTicketThread(true);
           }
@@ -619,15 +624,26 @@ export default function ChatWidget({
         text: reply,
         time: nowTime(),
         sortAt: botAt,
+        isStaff: false,
+        senderAvatar: null,
+        senderName: fromFaq ? undefined : "AI Assistant",
         ...(fromFaq ? { faqLocal: true, faqForQuestion: userMsg.text } : {}),
       };
       setMessages((m) => [...m, botMsg]);
-    } catch (err: unknown) {
+      } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       const reply = userFacingChatError(msg);
       setMessages((m) => [
         ...m,
-        { role: "bot", text: reply, time: nowTime(), sortAt: new Date().toISOString() },
+        {
+          role: "bot",
+          text: reply,
+          time: nowTime(),
+          sortAt: new Date().toISOString(),
+          isStaff: false,
+          senderAvatar: null,
+          senderName: "AI Assistant",
+        },
       ]);
     } finally {
       setAwaitingBot(false);
@@ -1005,12 +1021,33 @@ export default function ChatWidget({
       setVisitor(profile);
       visitorRef.current = profile;
       saveVisitorSession(profile, projectToken);
-      // Don't auto-open an old ticket thread — keep FAQ / AI / Talk to agent home.
-      setInTicketThread(false);
-      setMessages(loadSelfServeTranscript(projectToken, profile.email));
+      const restored = loadSelfServeTranscript(projectToken, profile.email);
+      setMessages(restored);
       setTicketSummary(null);
       setHelpOpen(false);
       setView("main");
+
+      // Don't auto-open an old ticket unless the visitor never exited agent chat.
+      setInTicketThread(false);
+      if (apiBase !== undefined && profile.ticketId && profile.accessToken) {
+        try {
+          const summary = await getVisitorTicket(
+            apiBase,
+            profile.ticketId,
+            profile.accessToken,
+          );
+          setTicketSummary(summary);
+          const stillInAgentMode =
+            summary.status !== "resolved" &&
+            lastAgentModeNotice(restored) === "enter";
+          if (summary.canRate || stillInAgentMode) {
+            setRatingSkipped(false);
+            setInTicketThread(true);
+          }
+        } catch {
+          /* keep home */
+        }
+      }
     } catch (e) {
       setPrechatError(e instanceof Error ? e.message : "Could not save your details");
     } finally {

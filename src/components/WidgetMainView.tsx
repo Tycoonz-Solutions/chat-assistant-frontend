@@ -224,7 +224,7 @@ export default function WidgetMainView({
                 opacity: interactionLocked ? 0.55 : 1,
               }}
             >
-              Talk to agent
+              {resumableTicketId ? "Resume agent chat" : "Talk to agent"}
             </button>
           ) : null}
           {onClose ? <WidgetCloseButton onClose={onClose} /> : null}

@@ -76,10 +76,12 @@ export default function MessageList({
 
         const isBot = msg.role === 'bot';
         const showStaffName = isBot && msg.isStaff && msg.senderName;
-        const avatarSrc =
-          (msg.isStaff &&
-            resolveWidgetAssetUrl(apiBaseUrl, msg.senderAvatar)) ||
-          defaultAvatarSrc;
+        const showAiName =
+          isBot && !msg.isStaff && !msg.isSystem && Boolean(msg.senderName);
+        // Staff photo only for real staff rows — never reuse it for AI/FAQ replies.
+        const avatarSrc = msg.isStaff
+          ? resolveWidgetAssetUrl(apiBaseUrl, msg.senderAvatar) || defaultAvatarSrc
+          : defaultAvatarSrc;
         return (
           <div key={msg.id ?? `local-${idx}`} className={`message-row ${isBot ? 'bot' : 'user'}`}>
             {isBot && (
@@ -98,7 +100,7 @@ export default function MessageList({
             )}
 
             <div className={`message-content ${isBot ? 'bot' : 'user'}`}>
-              {showStaffName ? (
+              {showStaffName || showAiName ? (
                 <div
                   style={{
                     fontSize: 12,

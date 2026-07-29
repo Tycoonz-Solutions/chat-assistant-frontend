@@ -516,7 +516,8 @@ function MessageList({
       }
       const isBot = msg.role === "bot";
       const showStaffName = isBot && msg.isStaff && msg.senderName;
-      const avatarSrc = msg.isStaff && resolveWidgetAssetUrl(apiBaseUrl, msg.senderAvatar) || defaultAvatarSrc;
+      const showAiName = isBot && !msg.isStaff && !msg.isSystem && Boolean(msg.senderName);
+      const avatarSrc = msg.isStaff ? resolveWidgetAssetUrl(apiBaseUrl, msg.senderAvatar) || defaultAvatarSrc : defaultAvatarSrc;
       return /* @__PURE__ */ jsxs2("div", { className: `message-row ${isBot ? "bot" : "user"}`, children: [
         isBot && /* @__PURE__ */ jsx5("div", { className: "bot-avatar", "aria-hidden": true, children: /* @__PURE__ */ jsx5(
           "img",
@@ -532,7 +533,7 @@ function MessageList({
           }
         ) }),
         /* @__PURE__ */ jsxs2("div", { className: `message-content ${isBot ? "bot" : "user"}`, children: [
-          showStaffName ? /* @__PURE__ */ jsx5(
+          showStaffName || showAiName ? /* @__PURE__ */ jsx5(
             "div",
             {
               style: {
@@ -1431,7 +1432,7 @@ function WidgetMainView({
                       cursor: interactionLocked ? "not-allowed" : "pointer",
                       opacity: interactionLocked ? 0.55 : 1
                     },
-                    children: "Talk to agent"
+                    children: resumableTicketId ? "Resume agent chat" : "Talk to agent"
                   }
                 ) : null,
                 onClose ? /* @__PURE__ */ jsx12(WidgetCloseButton, { onClose }) : null
@@ -2445,6 +2446,16 @@ function mergeLocalIntoTicketThread(ticketThread, localMsgs) {
 }
 var AGENT_ENTER_NOTICE = "You've reached our customer support agent";
 var AGENT_EXIT_NOTICE = "You've left customer support";
+function lastAgentModeNotice(messages) {
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const m = messages[i];
+    if (!m?.isSystem) continue;
+    const text = String(m.text || "").trim();
+    if (text === AGENT_ENTER_NOTICE) return "enter";
+    if (text === AGENT_EXIT_NOTICE) return "exit";
+  }
+  return null;
+}
 function appendSystemNotice(messages, text) {
   const trimmed = text.trim();
   if (!trimmed) return messages;
@@ -2963,7 +2974,8 @@ function ChatWidget({
           );
           if (cancelled) return;
           setTicketSummary(summary);
-          if (summary.canRate) {
+          const stillInAgentMode = summary.status !== "resolved" && lastAgentModeNotice(restored) === "enter";
+          if (summary.canRate || stillInAgentMode) {
             setRatingSkipped(false);
             setInTicketThread(true);
           }
@@ -3151,6 +3163,9 @@ function ChatWidget({
         text: reply,
         time: nowTime(),
         sortAt: botAt,
+        isStaff: false,
+        senderAvatar: null,
+        senderName: fromFaq ? void 0 : "AI Assistant",
         ...fromFaq ? { faqLocal: true, faqForQuestion: userMsg.text } : {}
       };
       setMessages((m) => [...m, botMsg]);
@@ -3159,7 +3174,15 @@ function ChatWidget({
       const reply = userFacingChatError(msg);
       setMessages((m) => [
         ...m,
-        { role: "bot", text: reply, time: nowTime(), sortAt: (/* @__PURE__ */ new Date()).toISOString() }
+        {
+          role: "bot",
+          text: reply,
+          time: nowTime(),
+          sortAt: (/* @__PURE__ */ new Date()).toISOString(),
+          isStaff: false,
+          senderAvatar: null,
+          senderName: "AI Assistant"
+        }
       ]);
     } finally {
       setAwaitingBot(false);
@@ -3499,11 +3522,28 @@ function ChatWidget({
       setVisitor(profile);
       visitorRef.current = profile;
       saveVisitorSession(profile, projectToken);
-      setInTicketThread(false);
-      setMessages(loadSelfServeTranscript(projectToken, profile.email));
+      const restored = loadSelfServeTranscript(projectToken, profile.email);
+      setMessages(restored);
       setTicketSummary(null);
       setHelpOpen(false);
       setView("main");
+      setInTicketThread(false);
+      if (apiBase !== void 0 && profile.ticketId && profile.accessToken) {
+        try {
+          const summary = await getVisitorTicket(
+            apiBase,
+            profile.ticketId,
+            profile.accessToken
+          );
+          setTicketSummary(summary);
+          const stillInAgentMode = summary.status !== "resolved" && lastAgentModeNotice(restored) === "enter";
+          if (summary.canRate || stillInAgentMode) {
+            setRatingSkipped(false);
+            setInTicketThread(true);
+          }
+        } catch {
+        }
+      }
     } catch (e) {
       setPrechatError(e instanceof Error ? e.message : "Could not save your details");
     } finally {
