@@ -165,23 +165,13 @@ export function lastAgentModeNotice(
   return null;
 }
 
-/** Append a centered system divider at the end of the timeline (skip if already in thread). */
-export function appendSystemNotice(messages: Msg[], text: string): Msg[] {
-  const trimmed = text.trim();
-  if (!trimmed) return messages;
-  if (
-    messages.some(
-      (m) => m.isSystem && String(m.text || "").trim() === trimmed,
-    )
-  ) {
-    return messages;
-  }
+function pushSystemNotice(messages: Msg[], text: string): Msg[] {
   const sortAt = new Date().toISOString();
   return [
     ...messages,
     {
       role: "bot",
-      text: trimmed,
+      text: text,
       time: new Date().toLocaleTimeString([], {
         hour: "2-digit",
         minute: "2-digit",
@@ -191,4 +181,33 @@ export function appendSystemNotice(messages: Msg[], text: string): Msg[] {
       localOnly: true,
     },
   ];
+}
+
+/**
+ * Append a centered system divider.
+ * For agent enter/exit, allow repeats when the visitor transitions modes again
+ * (e.g. leave → AI chat → resume agent must show a new "reached support" notice).
+ * Other notices still skip if the same text already exists.
+ */
+export function appendSystemNotice(messages: Msg[], text: string): Msg[] {
+  const trimmed = text.trim();
+  if (!trimmed) return messages;
+
+  if (trimmed === AGENT_ENTER_NOTICE) {
+    if (lastAgentModeNotice(messages) === "enter") return messages;
+    return pushSystemNotice(messages, trimmed);
+  }
+  if (trimmed === AGENT_EXIT_NOTICE) {
+    if (lastAgentModeNotice(messages) === "exit") return messages;
+    return pushSystemNotice(messages, trimmed);
+  }
+
+  if (
+    messages.some(
+      (m) => m.isSystem && String(m.text || "").trim() === trimmed,
+    )
+  ) {
+    return messages;
+  }
+  return pushSystemNotice(messages, trimmed);
 }

@@ -9,10 +9,7 @@ import WidgetMainView from "./components/WidgetMainView";
 import PreChatScreen from "./components/PreChatScreen";
 import EscalateScreen from "./components/EscalateScreen";
 import type { EscalatePayload } from "./components/EscalateScreen";
-import {
-  buildEscalateTranscript,
-  lastUserMessageForEscalate,
-} from "./lib/build-escalate-transcript";
+import { buildEscalateTranscript } from "./lib/build-escalate-transcript";
 import {
   clearTicketCreatedNotice,
   markTicketCreatedNotice,
@@ -1496,7 +1493,6 @@ export default function ChatWidget({
             collectIdentity={collectIdentityOnEscalate}
             initialEmail={visitor?.email}
             initialName={visitor?.name}
-            initialSummary={lastUserMessageForEscalate(messages)}
             onClose={() => setOpen(false)}
           />
         )}
