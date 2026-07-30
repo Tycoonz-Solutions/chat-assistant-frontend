@@ -2895,25 +2895,31 @@ function ChatWidget({
   const visitorAccessToken = visitor?.accessToken ?? null;
   const ticketSyncInFlightRef = useRef2(false);
   const ticketSyncQueuedRef = useRef2(false);
+  const ticketSummaryRef = useRef2(ticketSummary);
+  ticketSummaryRef.current = ticketSummary;
+  const ticketSyncWantSummaryRef = useRef2(false);
   const ratingSkipStorageKey = useCallback(
     (ticketId) => {
       return `chat-widget-rating-skipped-${widgetProjectStorageId(projectToken)}-${ticketId}`;
     },
     [projectToken]
   );
-  const syncTicketThread = useCallback(async () => {
+  const syncTicketThread = useCallback(async (opts) => {
     const tid = visitorRef.current?.ticketId;
     const token = visitorRef.current?.accessToken;
     if (apiBase === void 0 || !tid || !token) return;
+    if (opts?.refreshSummary) ticketSyncWantSummaryRef.current = true;
     if (ticketSyncInFlightRef.current) {
       ticketSyncQueuedRef.current = true;
       return;
     }
     ticketSyncInFlightRef.current = true;
     try {
+      const wantSummary = ticketSyncWantSummaryRef.current || ticketSummaryRef.current == null;
+      ticketSyncWantSummaryRef.current = false;
       const [rows, summary] = await Promise.all([
         listVisitorTicketMessages(apiBase, tid, token),
-        getVisitorTicket(apiBase, tid, token)
+        wantSummary ? getVisitorTicket(apiBase, tid, token) : Promise.resolve(null)
       ]);
       const ticketMsgs = dedupeAdjacentModeNotices(
         rows.map(ticketMessageToWidgetMsg)
@@ -2939,7 +2945,7 @@ function ChatWidget({
         visitorRef.current?.email,
         thread
       );
-      setTicketSummary(summary);
+      if (summary) setTicketSummary(summary);
     } catch (err) {
       console.warn("[ChatWidget] Could not sync ticket messages", err);
     } finally {
@@ -3796,7 +3802,7 @@ function ChatWidget({
         setTicketSummary(null);
         setRatingSkipped(false);
         setAllowResolvedReply(false);
-        await syncTicketThread();
+        await syncTicketThread({ refreshSummary: true });
       } else {
         setMessages((m) => [
           ...m,

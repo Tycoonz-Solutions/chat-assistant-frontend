@@ -230,6 +230,10 @@ export default function ChatWidget({
 
   const ticketSyncInFlightRef = useRef(false);
   const ticketSyncQueuedRef = useRef(false);
+  const ticketSummaryRef = useRef(ticketSummary);
+  ticketSummaryRef.current = ticketSummary;
+  /** When true, the queued follow-up sync should also refresh ticket summary. */
+  const ticketSyncWantSummaryRef = useRef(false);
 
   const ratingSkipStorageKey = useCallback(
     (ticketId: string) => {
@@ -238,10 +242,11 @@ export default function ChatWidget({
     [projectToken],
   );
 
-  const syncTicketThread = useCallback(async () => {
+  const syncTicketThread = useCallback(async (opts?: { refreshSummary?: boolean }) => {
     const tid = visitorRef.current?.ticketId;
     const token = visitorRef.current?.accessToken;
     if (apiBase === undefined || !tid || !token) return;
+    if (opts?.refreshSummary) ticketSyncWantSummaryRef.current = true;
     if (ticketSyncInFlightRef.current) {
       ticketSyncQueuedRef.current = true;
       return;
@@ -249,9 +254,15 @@ export default function ChatWidget({
 
     ticketSyncInFlightRef.current = true;
     try {
+      const wantSummary =
+        ticketSyncWantSummaryRef.current || ticketSummaryRef.current == null;
+      ticketSyncWantSummaryRef.current = false;
+
       const [rows, summary] = await Promise.all([
         listVisitorTicketMessages(apiBase, tid, token),
-        getVisitorTicket(apiBase, tid, token),
+        wantSummary
+          ? getVisitorTicket(apiBase, tid, token)
+          : Promise.resolve(null),
       ]);
       // Ticket messages are the timeline. Local storage only fills unsynced AI/FAQ turns.
       const ticketMsgs = dedupeAdjacentModeNotices(
@@ -284,7 +295,7 @@ export default function ChatWidget({
         visitorRef.current?.email,
         thread,
       );
-      setTicketSummary(summary);
+      if (summary) setTicketSummary(summary);
     } catch (err) {
       console.warn("[ChatWidget] Could not sync ticket messages", err);
     } finally {
@@ -1265,7 +1276,7 @@ export default function ChatWidget({
         setRatingSkipped(false);
         setAllowResolvedReply(false);
         // Backend already writes the handoff system notice — don't add a local duplicate.
-        await syncTicketThread();
+        await syncTicketThread({ refreshSummary: true });
       } else {
         setMessages((m) => [
           ...m,
