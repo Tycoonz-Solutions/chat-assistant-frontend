@@ -182,6 +182,7 @@ export default function WidgetMainView({
               type="button"
               onClick={onExitAgentChat}
               disabled={interactionLocked}
+              aria-busy={interactionLocked}
               style={{
                 flexShrink: 0,
                 background: "rgba(255,255,255,0.2)",
@@ -195,7 +196,7 @@ export default function WidgetMainView({
                 opacity: interactionLocked ? 0.55 : 1,
               }}
             >
-              Exit agent chat
+              {interactionLocked ? "Please wait…" : "Exit agent chat"}
             </button>
           ) : null}
           {!hasActiveTicket &&
@@ -204,6 +205,7 @@ export default function WidgetMainView({
             <button
               type="button"
               onClick={() => {
+                if (interactionLocked) return;
                 if (resumableTicketId && onResumeTicket) {
                   onResumeTicket();
                   return;
@@ -211,6 +213,7 @@ export default function WidgetMainView({
                 onContactSupport?.();
               }}
               disabled={interactionLocked}
+              aria-busy={interactionLocked}
               style={{
                 flexShrink: 0,
                 background: "rgba(255,255,255,0.2)",
@@ -224,7 +227,11 @@ export default function WidgetMainView({
                 opacity: interactionLocked ? 0.55 : 1,
               }}
             >
-              {resumableTicketId ? "Resume agent chat" : "Talk to agent"}
+              {interactionLocked
+                ? "Please wait…"
+                : resumableTicketId
+                  ? "Resume agent chat"
+                  : "Talk to agent"}
             </button>
           ) : null}
           {onClose ? <WidgetCloseButton onClose={onClose} /> : null}

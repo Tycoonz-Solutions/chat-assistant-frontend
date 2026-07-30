@@ -136,9 +136,8 @@ export function lastAgentModeNotice(
 }
 
 /**
- * Keep local FAQ/AI (and any unsynced turns) when entering or refreshing the agent thread.
- * Prefer ticket rows when the same content already exists on the ticket — unless the local
- * turn is newer than the ticket tip (post-exit AI must survive resume).
+ * Keep local FAQ/AI (and any unsynced turns) when refreshing the ticket thread.
+ * Enter/exit notices live ONLY on the ticket — never merge local copies of those.
  */
 export function mergeLocalIntoTicketThread(
   ticketThread: Msg[],
@@ -152,29 +151,14 @@ export function mergeLocalIntoTicketThread(
   const seenText = new Set(ticketThread.map(messageDedupeKey));
   const ticketTip = latestSortAt(ticketThread);
   const extras: Msg[] = [];
-  const mergedSoFar = () => [...ticketThread, ...extras];
 
   for (const m of localMsgs) {
     if (m.ticketCreatedNotice) continue;
     if (m.id && byId.has(m.id)) continue;
 
-    const mode = m.isSystem ? modeOfNotice(String(m.text || "")) : null;
-    if (m.localOnly || mode) {
-      if (mode && lastAgentModeNotice(mergedSoFar()) === mode) continue;
-      if (
-        m.localOnly &&
-        extras.some(
-          (e) =>
-            e.localOnly &&
-            e.text === m.text &&
-            (e.sortAt ?? "") === (m.sortAt ?? ""),
-        )
-      ) {
-        continue;
-      }
-      extras.push(m);
-      continue;
-    }
+    // Mode notices are ticket-only; local copies cause duplicates / wrong order.
+    if (m.isSystem && modeOfNotice(String(m.text || ""))) continue;
+    if (m.localOnly && m.isSystem) continue;
 
     const key = messageDedupeKey(m);
     if (!m.text.trim()) continue;
@@ -185,16 +169,52 @@ export function mergeLocalIntoTicketThread(
   }
 
   if (!extras.length) return ticketThread;
-  return [...ticketThread, ...extras].sort(compareMsgs);
+  return dedupeAdjacentModeNotices([...ticketThread, ...extras].sort(compareMsgs));
 }
 
-function pushSystemNotice(messages: Msg[], text: string): Msg[] {
+/** Collapse consecutive identical enter/exit notices (legacy duplicate rows). */
+export function dedupeAdjacentModeNotices(messages: Msg[]): Msg[] {
+  const out: Msg[] = [];
+  for (const m of messages) {
+    const mode = m.isSystem ? modeOfNotice(String(m.text || "")) : null;
+    if (mode && out.length > 0) {
+      const prev = out[out.length - 1];
+      if (
+        prev?.isSystem &&
+        modeOfNotice(String(prev.text || "")) === mode
+      ) {
+        continue;
+      }
+    }
+    out.push(m);
+  }
+  return out;
+}
+
+/**
+ * Append a non-mode system divider locally (e.g. rare UI-only notices).
+ * Enter/exit must be written via the ticket notices API — not sessionStorage.
+ */
+export function appendSystemNotice(messages: Msg[], text: string): Msg[] {
+  const trimmed = text.trim();
+  if (!trimmed) return messages;
+
+  // Ticket DB owns enter/exit; never park them as localOnly.
+  if (modeOfNotice(trimmed)) return messages;
+
+  if (
+    messages.some(
+      (m) => m.isSystem && String(m.text || "").trim() === trimmed,
+    )
+  ) {
+    return messages;
+  }
   const sortAt = new Date().toISOString();
   return [
     ...messages,
     {
       role: "bot",
-      text: text,
+      text: trimmed,
       time: new Date().toLocaleTimeString([], {
         hour: "2-digit",
         minute: "2-digit",
@@ -204,31 +224,6 @@ function pushSystemNotice(messages: Msg[], text: string): Msg[] {
       localOnly: true,
     },
   ];
-}
-
-/**
- * Append a centered system divider.
- * For agent enter/exit, allow repeats when the visitor transitions modes again
- * (e.g. leave → AI chat → resume agent must show a new "reached support" notice).
- */
-export function appendSystemNotice(messages: Msg[], text: string): Msg[] {
-  const trimmed = text.trim();
-  if (!trimmed) return messages;
-
-  const mode = modeOfNotice(trimmed);
-  if (mode) {
-    if (lastAgentModeNotice(messages) === mode) return messages;
-    return pushSystemNotice(messages, trimmed);
-  }
-
-  if (
-    messages.some(
-      (m) => m.isSystem && String(m.text || "").trim() === trimmed,
-    )
-  ) {
-    return messages;
-  }
-  return pushSystemNotice(messages, trimmed);
 }
 
 /** Self-serve FAQ/AI turns after the latest exit notice (for syncing onto the ticket). */

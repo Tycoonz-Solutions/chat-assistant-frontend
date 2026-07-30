@@ -241,7 +241,7 @@ export async function postVisitorTicketNotice(
   ticketId: string,
   accessToken: string,
   kind: "enter" | "exit",
-): Promise<void> {
+): Promise<VisitorTicketMessage | null> {
   const base = apiBaseUrl.replace(/\/$/, "");
   const res = await fetch(
     `${base}/api/v1/chat-bot/auth/ticket/${encodeURIComponent(ticketId)}/notices`,
@@ -262,6 +262,8 @@ export async function postVisitorTicketNotice(
         : `Could not record notice (${res.status})`,
     );
   }
+  const list = parseTicketMessages(json);
+  return list[0] ?? null;
 }
 
 export async function postVisitorSelfServeTranscript(

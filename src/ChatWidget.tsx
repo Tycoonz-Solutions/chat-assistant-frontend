@@ -29,12 +29,12 @@ import {
   postVisitorTicketNotice,
   postVisitorSelfServeTranscript,
   postVisitorTicketRating,
+  type VisitorTicketMessage,
   type VisitorTicketSummary,
 } from "./widget-visitor-api";
 import {
-  AGENT_EXIT_NOTICE,
-  appendSystemNotice,
   buildVisitorThread,
+  dedupeAdjacentModeNotices,
   lastAgentModeNotice,
   mergeLocalIntoTicketThread,
   selfServeTurnsSinceLastExit,
@@ -253,15 +253,16 @@ export default function ChatWidget({
         listVisitorTicketMessages(apiBase, tid, token),
         getVisitorTicket(apiBase, tid, token),
       ]);
-      const ticketMsgs = rows.map(ticketMessageToWidgetMsg);
+      // Ticket messages are the timeline. Local storage only fills unsynced AI/FAQ turns.
+      const ticketMsgs = dedupeAdjacentModeNotices(
+        rows.map(ticketMessageToWidgetMsg),
+      );
       const faqExchanges = loadFaqTranscript(projectToken, tid);
       const ticketThread = buildVisitorThread(ticketMsgs, faqExchanges);
       const stored = loadSelfServeTranscript(
         projectToken,
         visitorRef.current?.email,
       );
-      // Prefer live UI + storage so enter/exit notices appended during this sync
-      // are not wiped by a stale sessionStorage snapshot.
       const memory = messagesRef.current;
       const localMsgs =
         memory.length && stored.length
@@ -270,19 +271,19 @@ export default function ChatWidget({
             ? memory
             : stored;
       const merged = mergeLocalIntoTicketThread(ticketThread, localMsgs);
-      // Notices may have been appended while we awaited the network — fold them in.
-      const withLiveNotices = mergeLocalIntoTicketThread(
-        merged,
-        messagesRef.current,
-      );
       const thread = withTicketCreatedNotice(
-        withLiveNotices,
+        dedupeAdjacentModeNotices(merged),
         projectToken,
         String(tid),
         () =>
           new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       );
       setMessages(thread);
+      saveSelfServeTranscript(
+        projectToken,
+        visitorRef.current?.email,
+        thread,
+      );
       setTicketSummary(summary);
     } catch (err) {
       console.warn("[ChatWidget] Could not sync ticket messages", err);
@@ -645,16 +646,10 @@ export default function ChatWidget({
         return next;
       });
 
-      // Keep open-ticket agents in the loop when visitor chats with AI after exiting.
+      // Persist post-exit AI/FAQ turns on the ticket so one ordered thread stays in DB.
       const openTid = visitorRef.current?.ticketId;
       const openTok = visitorRef.current?.accessToken;
-      if (
-        apiBase !== undefined &&
-        openTid &&
-        openTok &&
-        !inTicketThread &&
-        !fromFaq
-      ) {
+      if (apiBase !== undefined && openTid && openTok && !inTicketThread) {
         try {
           await postVisitorSelfServeTranscript(apiBase, openTid, openTok, [
             { role: "user", content: userMsg.text, at: sentAt },
@@ -1151,55 +1146,79 @@ export default function ChatWidget({
     setHelpOpen(false);
   }
 
+  const appendModeNoticeFromApi = useCallback((row: VisitorTicketMessage) => {
+    const mapped = ticketMessageToWidgetMsg(row);
+    setMessages((m) => {
+      if (mapped.id && m.some((x) => x.id === mapped.id)) return m;
+      const next = dedupeAdjacentModeNotices([...m, mapped]);
+      saveSelfServeTranscript(
+        projectToken,
+        visitorRef.current?.email,
+        next,
+      );
+      return next;
+    });
+  }, [projectToken]);
+
   async function handleResumeTicket() {
     if (!activeTicketId) return;
+    if (!acquireInteractionLock()) return;
+
     const tid = activeTicketId;
     const token = visitorRef.current?.accessToken;
+    setHelpOpen(false);
     saveSelfServeTranscript(
       projectToken,
       visitorRef.current?.email,
       messagesRef.current,
     );
 
-    const pending = selfServeTurnsSinceLastExit(messagesRef.current);
-    if (apiBase !== undefined && token && pending.length) {
-      try {
-        await postVisitorSelfServeTranscript(apiBase, tid, token, pending);
-      } catch (err) {
-        console.warn("[ChatWidget] Could not sync self-serve turns before resume", err);
+    try {
+      const pending = selfServeTurnsSinceLastExit(messagesRef.current);
+      if (apiBase !== undefined && token && pending.length) {
+        try {
+          await postVisitorSelfServeTranscript(apiBase, tid, token, pending);
+        } catch (err) {
+          console.warn("[ChatWidget] Could not sync self-serve turns before resume", err);
+        }
       }
-    }
-    if (apiBase !== undefined && token) {
-      try {
-        await postVisitorTicketNotice(apiBase, tid, token, "enter");
-      } catch (err) {
-        console.warn("[ChatWidget] Could not record resume notice", err);
+      if (apiBase !== undefined && token) {
+        try {
+          const notice = await postVisitorTicketNotice(apiBase, tid, token, "enter");
+          if (notice) appendModeNoticeFromApi(notice);
+        } catch (err) {
+          console.warn("[ChatWidget] Could not record resume notice", err);
+        }
       }
-    }
 
-    setInTicketThread(true);
-    setHelpOpen(false);
-    await syncTicketThread();
+      setInTicketThread(true);
+      // Reconcile in the background; notice is already on screen from the POST.
+      void syncTicketThread();
+    } finally {
+      releaseInteractionLock();
+    }
   }
 
   async function handleExitAgentChat() {
-    if (interactionLockRef.current) return;
+    if (!acquireInteractionLock()) return;
     const tid = visitorRef.current?.ticketId;
     const token = visitorRef.current?.accessToken;
-    setMessages((m) => {
-      const next = appendSystemNotice(m, AGENT_EXIT_NOTICE);
-      saveSelfServeTranscript(projectToken, visitorRef.current?.email, next);
-      return next;
-    });
-    setInTicketThread(false);
     setHelpOpen(false);
     setAllowResolvedReply(false);
-    if (apiBase !== undefined && tid && token) {
-      try {
-        await postVisitorTicketNotice(apiBase, tid, token, "exit");
-      } catch (err) {
-        console.warn("[ChatWidget] Could not record exit notice", err);
+
+    try {
+      if (apiBase !== undefined && tid && token) {
+        try {
+          const notice = await postVisitorTicketNotice(apiBase, tid, token, "exit");
+          if (notice) appendModeNoticeFromApi(notice);
+        } catch (err) {
+          console.warn("[ChatWidget] Could not record exit notice", err);
+        }
       }
+      setInTicketThread(false);
+      void syncTicketThread();
+    } finally {
+      releaseInteractionLock();
     }
   }
 

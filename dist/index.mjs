@@ -1393,6 +1393,7 @@ function WidgetMainView({
                     type: "button",
                     onClick: onExitAgentChat,
                     disabled: interactionLocked,
+                    "aria-busy": interactionLocked,
                     style: {
                       flexShrink: 0,
                       background: "rgba(255,255,255,0.2)",
@@ -1405,7 +1406,7 @@ function WidgetMainView({
                       cursor: interactionLocked ? "not-allowed" : "pointer",
                       opacity: interactionLocked ? 0.55 : 1
                     },
-                    children: "Exit agent chat"
+                    children: interactionLocked ? "Please wait\u2026" : "Exit agent chat"
                   }
                 ) : null,
                 !hasActiveTicket && (canEscalate && onContactSupport || resumableTicketId && onResumeTicket) ? /* @__PURE__ */ jsx12(
@@ -1413,6 +1414,7 @@ function WidgetMainView({
                   {
                     type: "button",
                     onClick: () => {
+                      if (interactionLocked) return;
                       if (resumableTicketId && onResumeTicket) {
                         onResumeTicket();
                         return;
@@ -1420,6 +1422,7 @@ function WidgetMainView({
                       onContactSupport?.();
                     },
                     disabled: interactionLocked,
+                    "aria-busy": interactionLocked,
                     style: {
                       flexShrink: 0,
                       background: "rgba(255,255,255,0.2)",
@@ -1432,7 +1435,7 @@ function WidgetMainView({
                       cursor: interactionLocked ? "not-allowed" : "pointer",
                       opacity: interactionLocked ? 0.55 : 1
                     },
-                    children: resumableTicketId ? "Resume agent chat" : "Talk to agent"
+                    children: interactionLocked ? "Please wait\u2026" : resumableTicketId ? "Resume agent chat" : "Talk to agent"
                   }
                 ) : null,
                 onClose ? /* @__PURE__ */ jsx12(WidgetCloseButton, { onClose }) : null
@@ -2328,6 +2331,8 @@ async function postVisitorTicketNotice(apiBaseUrl, ticketId, accessToken, kind) 
       typeof json.message === "string" && json.message ? json.message : `Could not record notice (${res.status})`
     );
   }
+  const list = parseTicketMessages(json);
+  return list[0] ?? null;
 }
 async function postVisitorSelfServeTranscript(apiBaseUrl, ticketId, accessToken, transcript) {
   if (!transcript.length) return;
@@ -2493,21 +2498,11 @@ function mergeLocalIntoTicketThread(ticketThread, localMsgs) {
   const seenText = new Set(ticketThread.map(messageDedupeKey));
   const ticketTip = latestSortAt(ticketThread);
   const extras = [];
-  const mergedSoFar = () => [...ticketThread, ...extras];
   for (const m of localMsgs) {
     if (m.ticketCreatedNotice) continue;
     if (m.id && byId.has(m.id)) continue;
-    const mode = m.isSystem ? modeOfNotice(String(m.text || "")) : null;
-    if (m.localOnly || mode) {
-      if (mode && lastAgentModeNotice(mergedSoFar()) === mode) continue;
-      if (m.localOnly && extras.some(
-        (e) => e.localOnly && e.text === m.text && (e.sortAt ?? "") === (m.sortAt ?? "")
-      )) {
-        continue;
-      }
-      extras.push(m);
-      continue;
-    }
+    if (m.isSystem && modeOfNotice(String(m.text || ""))) continue;
+    if (m.localOnly && m.isSystem) continue;
     const key = messageDedupeKey(m);
     if (!m.text.trim()) continue;
     const newerThanTicket = Boolean(m.sortAt && ticketTip && m.sortAt > ticketTip);
@@ -2516,39 +2511,21 @@ function mergeLocalIntoTicketThread(ticketThread, localMsgs) {
     extras.push(m);
   }
   if (!extras.length) return ticketThread;
-  return [...ticketThread, ...extras].sort(compareMsgs);
+  return dedupeAdjacentModeNotices([...ticketThread, ...extras].sort(compareMsgs));
 }
-function pushSystemNotice(messages, text) {
-  const sortAt = (/* @__PURE__ */ new Date()).toISOString();
-  return [
-    ...messages,
-    {
-      role: "bot",
-      text,
-      time: (/* @__PURE__ */ new Date()).toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit"
-      }),
-      sortAt,
-      isSystem: true,
-      localOnly: true
+function dedupeAdjacentModeNotices(messages) {
+  const out = [];
+  for (const m of messages) {
+    const mode = m.isSystem ? modeOfNotice(String(m.text || "")) : null;
+    if (mode && out.length > 0) {
+      const prev = out[out.length - 1];
+      if (prev?.isSystem && modeOfNotice(String(prev.text || "")) === mode) {
+        continue;
+      }
     }
-  ];
-}
-function appendSystemNotice(messages, text) {
-  const trimmed = text.trim();
-  if (!trimmed) return messages;
-  const mode = modeOfNotice(trimmed);
-  if (mode) {
-    if (lastAgentModeNotice(messages) === mode) return messages;
-    return pushSystemNotice(messages, trimmed);
+    out.push(m);
   }
-  if (messages.some(
-    (m) => m.isSystem && String(m.text || "").trim() === trimmed
-  )) {
-    return messages;
-  }
-  return pushSystemNotice(messages, trimmed);
+  return out;
 }
 function selfServeTurnsSinceLastExit(messages) {
   let start = 0;
@@ -2938,7 +2915,9 @@ function ChatWidget({
         listVisitorTicketMessages(apiBase, tid, token),
         getVisitorTicket(apiBase, tid, token)
       ]);
-      const ticketMsgs = rows.map(ticketMessageToWidgetMsg);
+      const ticketMsgs = dedupeAdjacentModeNotices(
+        rows.map(ticketMessageToWidgetMsg)
+      );
       const faqExchanges = loadFaqTranscript(projectToken, tid);
       const ticketThread = buildVisitorThread(ticketMsgs, faqExchanges);
       const stored = loadSelfServeTranscript(
@@ -2948,17 +2927,18 @@ function ChatWidget({
       const memory = messagesRef.current;
       const localMsgs = memory.length && stored.length ? mergeLocalIntoTicketThread(stored, memory) : memory.length ? memory : stored;
       const merged = mergeLocalIntoTicketThread(ticketThread, localMsgs);
-      const withLiveNotices = mergeLocalIntoTicketThread(
-        merged,
-        messagesRef.current
-      );
       const thread = withTicketCreatedNotice(
-        withLiveNotices,
+        dedupeAdjacentModeNotices(merged),
         projectToken,
         String(tid),
         () => (/* @__PURE__ */ new Date()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
       );
       setMessages(thread);
+      saveSelfServeTranscript(
+        projectToken,
+        visitorRef.current?.email,
+        thread
+      );
       setTicketSummary(summary);
     } catch (err) {
       console.warn("[ChatWidget] Could not sync ticket messages", err);
@@ -3264,7 +3244,7 @@ function ChatWidget({
       });
       const openTid = visitorRef.current?.ticketId;
       const openTok = visitorRef.current?.accessToken;
-      if (apiBase !== void 0 && openTid && openTok && !inTicketThread && !fromFaq) {
+      if (apiBase !== void 0 && openTid && openTok && !inTicketThread) {
         try {
           await postVisitorSelfServeTranscript(apiBase, openTid, openTok, [
             { role: "user", content: userMsg.text, at: sentAt },
@@ -3710,52 +3690,72 @@ function ChatWidget({
     setText("");
     setHelpOpen(false);
   }
+  const appendModeNoticeFromApi = useCallback((row) => {
+    const mapped = ticketMessageToWidgetMsg(row);
+    setMessages((m) => {
+      if (mapped.id && m.some((x) => x.id === mapped.id)) return m;
+      const next = dedupeAdjacentModeNotices([...m, mapped]);
+      saveSelfServeTranscript(
+        projectToken,
+        visitorRef.current?.email,
+        next
+      );
+      return next;
+    });
+  }, [projectToken]);
   async function handleResumeTicket() {
     if (!activeTicketId) return;
+    if (!acquireInteractionLock()) return;
     const tid = activeTicketId;
     const token = visitorRef.current?.accessToken;
+    setHelpOpen(false);
     saveSelfServeTranscript(
       projectToken,
       visitorRef.current?.email,
       messagesRef.current
     );
-    const pending = selfServeTurnsSinceLastExit(messagesRef.current);
-    if (apiBase !== void 0 && token && pending.length) {
-      try {
-        await postVisitorSelfServeTranscript(apiBase, tid, token, pending);
-      } catch (err) {
-        console.warn("[ChatWidget] Could not sync self-serve turns before resume", err);
+    try {
+      const pending = selfServeTurnsSinceLastExit(messagesRef.current);
+      if (apiBase !== void 0 && token && pending.length) {
+        try {
+          await postVisitorSelfServeTranscript(apiBase, tid, token, pending);
+        } catch (err) {
+          console.warn("[ChatWidget] Could not sync self-serve turns before resume", err);
+        }
       }
-    }
-    if (apiBase !== void 0 && token) {
-      try {
-        await postVisitorTicketNotice(apiBase, tid, token, "enter");
-      } catch (err) {
-        console.warn("[ChatWidget] Could not record resume notice", err);
+      if (apiBase !== void 0 && token) {
+        try {
+          const notice = await postVisitorTicketNotice(apiBase, tid, token, "enter");
+          if (notice) appendModeNoticeFromApi(notice);
+        } catch (err) {
+          console.warn("[ChatWidget] Could not record resume notice", err);
+        }
       }
+      setInTicketThread(true);
+      void syncTicketThread();
+    } finally {
+      releaseInteractionLock();
     }
-    setInTicketThread(true);
-    setHelpOpen(false);
-    await syncTicketThread();
   }
   async function handleExitAgentChat() {
-    if (interactionLockRef.current) return;
+    if (!acquireInteractionLock()) return;
     const tid = visitorRef.current?.ticketId;
     const token = visitorRef.current?.accessToken;
-    setMessages((m) => {
-      const next = appendSystemNotice(m, AGENT_EXIT_NOTICE);
-      saveSelfServeTranscript(projectToken, visitorRef.current?.email, next);
-      return next;
-    });
-    setInTicketThread(false);
     setHelpOpen(false);
     setAllowResolvedReply(false);
-    if (apiBase !== void 0 && tid && token) {
-      try {
-        await postVisitorTicketNotice(apiBase, tid, token, "exit");
-      } catch (err) {
-        console.warn("[ChatWidget] Could not record exit notice", err);
+    try {
+      if (apiBase !== void 0 && tid && token) {
+        try {
+          const notice = await postVisitorTicketNotice(apiBase, tid, token, "exit");
+          if (notice) appendModeNoticeFromApi(notice);
+        } catch (err) {
+          console.warn("[ChatWidget] Could not record exit notice", err);
+        }
       }
+      setInTicketThread(false);
+      void syncTicketThread();
+    } finally {
+      releaseInteractionLock();
     }
   }
   function handleContinueResolvedConversation() {
