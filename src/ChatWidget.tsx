@@ -9,7 +9,7 @@ import WidgetMainView from "./components/WidgetMainView";
 import PreChatScreen from "./components/PreChatScreen";
 import EscalateScreen from "./components/EscalateScreen";
 import type { EscalatePayload } from "./components/EscalateScreen";
-import { buildEscalateTranscript } from "./lib/build-escalate-transcript";
+import { buildEscalateTranscript, lastUserMessageForEscalate } from "./lib/build-escalate-transcript";
 import {
   clearTicketCreatedNotice,
   markTicketCreatedNotice,
@@ -26,16 +26,18 @@ import {
   postVisitorEscalate,
   postVisitorIdentify,
   postVisitorTicketMessage,
+  postVisitorTicketNotice,
+  postVisitorSelfServeTranscript,
   postVisitorTicketRating,
   type VisitorTicketSummary,
 } from "./widget-visitor-api";
 import {
-  AGENT_ENTER_NOTICE,
   AGENT_EXIT_NOTICE,
   appendSystemNotice,
   buildVisitorThread,
   lastAgentModeNotice,
   mergeLocalIntoTicketThread,
+  selfServeTurnsSinceLastExit,
   ticketMessageToWidgetMsg,
 } from "./lib/ticket-thread-ui";
 import { appendFaqExchange, clearFaqTranscript, loadFaqTranscript } from "./lib/faq-transcript";
@@ -254,16 +256,27 @@ export default function ChatWidget({
       const ticketMsgs = rows.map(ticketMessageToWidgetMsg);
       const faqExchanges = loadFaqTranscript(projectToken, tid);
       const ticketThread = buildVisitorThread(ticketMsgs, faqExchanges);
-      const local = loadSelfServeTranscript(
+      const stored = loadSelfServeTranscript(
         projectToken,
         visitorRef.current?.email,
       );
-      const merged = mergeLocalIntoTicketThread(
-        ticketThread,
-        local.length ? local : messagesRef.current,
+      // Prefer live UI + storage so enter/exit notices appended during this sync
+      // are not wiped by a stale sessionStorage snapshot.
+      const memory = messagesRef.current;
+      const localMsgs =
+        memory.length && stored.length
+          ? mergeLocalIntoTicketThread(stored, memory)
+          : memory.length
+            ? memory
+            : stored;
+      const merged = mergeLocalIntoTicketThread(ticketThread, localMsgs);
+      // Notices may have been appended while we awaited the network — fold them in.
+      const withLiveNotices = mergeLocalIntoTicketThread(
+        merged,
+        messagesRef.current,
       );
       const thread = withTicketCreatedNotice(
-        merged,
+        withLiveNotices,
         projectToken,
         String(tid),
         () =>
@@ -626,7 +639,31 @@ export default function ChatWidget({
         senderName: fromFaq ? undefined : "AI Assistant",
         ...(fromFaq ? { faqLocal: true, faqForQuestion: userMsg.text } : {}),
       };
-      setMessages((m) => [...m, botMsg]);
+      setMessages((m) => {
+        const next = [...m, botMsg];
+        saveSelfServeTranscript(projectToken, visitorRef.current?.email, next);
+        return next;
+      });
+
+      // Keep open-ticket agents in the loop when visitor chats with AI after exiting.
+      const openTid = visitorRef.current?.ticketId;
+      const openTok = visitorRef.current?.accessToken;
+      if (
+        apiBase !== undefined &&
+        openTid &&
+        openTok &&
+        !inTicketThread &&
+        !fromFaq
+      ) {
+        try {
+          await postVisitorSelfServeTranscript(apiBase, openTid, openTok, [
+            { role: "user", content: userMsg.text, at: sentAt },
+            { role: "assistant", content: reply, at: botAt },
+          ]);
+        } catch (err) {
+          console.warn("[ChatWidget] Could not sync AI turn to open ticket", err);
+        }
+      }
       } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       const reply = userFacingChatError(msg);
@@ -1116,19 +1153,39 @@ export default function ChatWidget({
 
   async function handleResumeTicket() {
     if (!activeTicketId) return;
+    const tid = activeTicketId;
+    const token = visitorRef.current?.accessToken;
     saveSelfServeTranscript(
       projectToken,
       visitorRef.current?.email,
       messagesRef.current,
     );
+
+    const pending = selfServeTurnsSinceLastExit(messagesRef.current);
+    if (apiBase !== undefined && token && pending.length) {
+      try {
+        await postVisitorSelfServeTranscript(apiBase, tid, token, pending);
+      } catch (err) {
+        console.warn("[ChatWidget] Could not sync self-serve turns before resume", err);
+      }
+    }
+    if (apiBase !== undefined && token) {
+      try {
+        await postVisitorTicketNotice(apiBase, tid, token, "enter");
+      } catch (err) {
+        console.warn("[ChatWidget] Could not record resume notice", err);
+      }
+    }
+
     setInTicketThread(true);
     setHelpOpen(false);
     await syncTicketThread();
-    setMessages((m) => appendSystemNotice(m, AGENT_ENTER_NOTICE));
   }
 
-  function handleExitAgentChat() {
+  async function handleExitAgentChat() {
     if (interactionLockRef.current) return;
+    const tid = visitorRef.current?.ticketId;
+    const token = visitorRef.current?.accessToken;
     setMessages((m) => {
       const next = appendSystemNotice(m, AGENT_EXIT_NOTICE);
       saveSelfServeTranscript(projectToken, visitorRef.current?.email, next);
@@ -1137,6 +1194,13 @@ export default function ChatWidget({
     setInTicketThread(false);
     setHelpOpen(false);
     setAllowResolvedReply(false);
+    if (apiBase !== undefined && tid && token) {
+      try {
+        await postVisitorTicketNotice(apiBase, tid, token, "exit");
+      } catch (err) {
+        console.warn("[ChatWidget] Could not record exit notice", err);
+      }
+    }
   }
 
   function handleContinueResolvedConversation() {
@@ -1181,8 +1245,8 @@ export default function ChatWidget({
         setTicketSummary(null);
         setRatingSkipped(false);
         setAllowResolvedReply(false);
+        // Backend already writes the handoff system notice — don't add a local duplicate.
         await syncTicketThread();
-        setMessages((m) => appendSystemNotice(m, AGENT_ENTER_NOTICE));
       } else {
         setMessages((m) => [
           ...m,
@@ -1493,6 +1557,7 @@ export default function ChatWidget({
             collectIdentity={collectIdentityOnEscalate}
             initialEmail={visitor?.email}
             initialName={visitor?.name}
+            initialSummary={lastUserMessageForEscalate(messages)}
             onClose={() => setOpen(false)}
           />
         )}

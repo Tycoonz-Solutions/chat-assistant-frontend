@@ -236,6 +236,63 @@ export async function postVisitorTicketMessage(
   return list[0];
 }
 
+export async function postVisitorTicketNotice(
+  apiBaseUrl: string,
+  ticketId: string,
+  accessToken: string,
+  kind: "enter" | "exit",
+): Promise<void> {
+  const base = apiBaseUrl.replace(/\/$/, "");
+  const res = await fetch(
+    `${base}/api/v1/chat-bot/auth/ticket/${encodeURIComponent(ticketId)}/notices`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ kind }),
+    },
+  );
+  const json = (await res.json()) as Record<string, unknown>;
+  if (!res.ok || json.success === false) {
+    throw new Error(
+      typeof json.message === "string" && json.message
+        ? json.message
+        : `Could not record notice (${res.status})`,
+    );
+  }
+}
+
+export async function postVisitorSelfServeTranscript(
+  apiBaseUrl: string,
+  ticketId: string,
+  accessToken: string,
+  transcript: EscalateTranscriptTurn[],
+): Promise<void> {
+  if (!transcript.length) return;
+  const base = apiBaseUrl.replace(/\/$/, "");
+  const res = await fetch(
+    `${base}/api/v1/chat-bot/auth/ticket/${encodeURIComponent(ticketId)}/self-serve`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ transcript }),
+    },
+  );
+  const json = (await res.json()) as Record<string, unknown>;
+  if (!res.ok || json.success === false) {
+    throw new Error(
+      typeof json.message === "string" && json.message
+        ? json.message
+        : `Could not sync self-serve chat (${res.status})`,
+    );
+  }
+}
+
 export type EscalateTranscriptTurn = {
   role: "user" | "assistant";
   content: string;

@@ -38,6 +38,8 @@ export function ticketMessageToWidgetMsg(m: VisitorTicketMessage): Msg {
       senderName: m.senderLabel || "AI Assistant",
       time,
       sortAt,
+      isStaff: false,
+      senderAvatar: null,
     };
   }
   const label =
@@ -92,6 +94,15 @@ function messageDedupeKey(m: Msg): string {
   return `${m.role}|${m.text.trim().toLowerCase()}`;
 }
 
+function latestSortAt(messages: Msg[]): string {
+  let max = "";
+  for (const m of messages) {
+    const t = m.sortAt ?? "";
+    if (t > max) max = t;
+  }
+  return max;
+}
+
 /** Ticket chat + FAQ quick-help, sorted by time (visitor-only FAQ rows). */
 export function buildVisitorThread(
   ticketMsgs: Msg[],
@@ -101,9 +112,33 @@ export function buildVisitorThread(
   return [...ticketMsgs, ...faqMsgs].sort(compareMsgs);
 }
 
+export const AGENT_ENTER_NOTICE = "You've reached our customer support agent";
+export const AGENT_EXIT_NOTICE = "You've left customer support";
+
+function modeOfNotice(text: string): "enter" | "exit" | null {
+  const t = text.trim();
+  if (t === AGENT_ENTER_NOTICE) return "enter";
+  if (t === AGENT_EXIT_NOTICE) return "exit";
+  return null;
+}
+
+/** Last enter/exit divider in the local timeline (ignores other system rows). */
+export function lastAgentModeNotice(
+  messages: Msg[],
+): "enter" | "exit" | null {
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const m = messages[i];
+    if (!m?.isSystem) continue;
+    const mode = modeOfNotice(String(m.text || ""));
+    if (mode) return mode;
+  }
+  return null;
+}
+
 /**
  * Keep local FAQ/AI (and any unsynced turns) when entering or refreshing the agent thread.
- * Prefer ticket rows when the same content already exists on the ticket.
+ * Prefer ticket rows when the same content already exists on the ticket — unless the local
+ * turn is newer than the ticket tip (post-exit AI must survive resume).
  */
 export function mergeLocalIntoTicketThread(
   ticketThread: Msg[],
@@ -115,54 +150,42 @@ export function mergeLocalIntoTicketThread(
     ticketThread.map((m) => m.id).filter((id): id is string => Boolean(id)),
   );
   const seenText = new Set(ticketThread.map(messageDedupeKey));
+  const ticketTip = latestSortAt(ticketThread);
   const extras: Msg[] = [];
+  const mergedSoFar = () => [...ticketThread, ...extras];
 
   for (const m of localMsgs) {
     if (m.ticketCreatedNotice) continue;
     if (m.id && byId.has(m.id)) continue;
-    // Mode notices (enter/exit agent) must survive sync even if ticket has a similar divider.
-    if (m.localOnly) {
-      const already =
+
+    const mode = m.isSystem ? modeOfNotice(String(m.text || "")) : null;
+    if (m.localOnly || mode) {
+      if (mode && lastAgentModeNotice(mergedSoFar()) === mode) continue;
+      if (
+        m.localOnly &&
         extras.some(
           (e) =>
             e.localOnly &&
             e.text === m.text &&
             (e.sortAt ?? "") === (m.sortAt ?? ""),
-        ) ||
-        ticketThread.some(
-          (t) =>
-            t.localOnly &&
-            t.text === m.text &&
-            (t.sortAt ?? "") === (m.sortAt ?? ""),
-        );
-      if (!already) extras.push(m);
+        )
+      ) {
+        continue;
+      }
+      extras.push(m);
       continue;
     }
+
     const key = messageDedupeKey(m);
-    if (!m.text.trim() || seenText.has(key)) continue;
+    if (!m.text.trim()) continue;
+    const newerThanTicket = Boolean(m.sortAt && ticketTip && m.sortAt > ticketTip);
+    if (seenText.has(key) && !newerThanTicket) continue;
     seenText.add(key);
     extras.push(m);
   }
 
   if (!extras.length) return ticketThread;
   return [...ticketThread, ...extras].sort(compareMsgs);
-}
-
-export const AGENT_ENTER_NOTICE = "You've reached our customer support agent";
-export const AGENT_EXIT_NOTICE = "You've left customer support";
-
-/** Last enter/exit divider in the local timeline (ignores other system rows). */
-export function lastAgentModeNotice(
-  messages: Msg[],
-): "enter" | "exit" | null {
-  for (let i = messages.length - 1; i >= 0; i -= 1) {
-    const m = messages[i];
-    if (!m?.isSystem) continue;
-    const text = String(m.text || "").trim();
-    if (text === AGENT_ENTER_NOTICE) return "enter";
-    if (text === AGENT_EXIT_NOTICE) return "exit";
-  }
-  return null;
 }
 
 function pushSystemNotice(messages: Msg[], text: string): Msg[] {
@@ -187,18 +210,14 @@ function pushSystemNotice(messages: Msg[], text: string): Msg[] {
  * Append a centered system divider.
  * For agent enter/exit, allow repeats when the visitor transitions modes again
  * (e.g. leave → AI chat → resume agent must show a new "reached support" notice).
- * Other notices still skip if the same text already exists.
  */
 export function appendSystemNotice(messages: Msg[], text: string): Msg[] {
   const trimmed = text.trim();
   if (!trimmed) return messages;
 
-  if (trimmed === AGENT_ENTER_NOTICE) {
-    if (lastAgentModeNotice(messages) === "enter") return messages;
-    return pushSystemNotice(messages, trimmed);
-  }
-  if (trimmed === AGENT_EXIT_NOTICE) {
-    if (lastAgentModeNotice(messages) === "exit") return messages;
+  const mode = modeOfNotice(trimmed);
+  if (mode) {
+    if (lastAgentModeNotice(messages) === mode) return messages;
     return pushSystemNotice(messages, trimmed);
   }
 
@@ -210,4 +229,37 @@ export function appendSystemNotice(messages: Msg[], text: string): Msg[] {
     return messages;
   }
   return pushSystemNotice(messages, trimmed);
+}
+
+/** Self-serve FAQ/AI turns after the latest exit notice (for syncing onto the ticket). */
+export function selfServeTurnsSinceLastExit(messages: Msg[]): Array<{
+  role: "user" | "assistant";
+  content: string;
+  at?: string;
+}> {
+  let start = 0;
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    if (
+      messages[i]?.isSystem &&
+      modeOfNotice(String(messages[i].text || "")) === "exit"
+    ) {
+      start = i + 1;
+      break;
+    }
+  }
+  return messages
+    .slice(start)
+    .filter(
+      (m) =>
+        !m.isSystem &&
+        !m.isStaff &&
+        !m.ticketCreatedNotice &&
+        (m.role === "user" || m.role === "bot") &&
+        m.text.trim().length > 0,
+    )
+    .map((m) => ({
+      role: (m.role === "user" ? "user" : "assistant") as "user" | "assistant",
+      content: m.text.trim(),
+      ...(m.sortAt ? { at: m.sortAt } : {}),
+    }));
 }

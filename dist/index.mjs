@@ -2011,6 +2011,15 @@ function buildEscalateTranscript(messages) {
     ...m.sortAt ? { at: m.sortAt } : {}
   }));
 }
+function lastUserMessageForEscalate(messages) {
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const m = messages[i];
+    if (m.role === "user" && !m.faqLocal && m.text.trim()) {
+      return m.text.trim();
+    }
+  }
+  return "";
+}
 
 // src/lib/chat-backend.ts
 function assertCompleteJwt(token, label = "Token") {
@@ -2300,6 +2309,47 @@ async function postVisitorTicketMessage(apiBaseUrl, ticketId, accessToken, text)
   if (!list[0]) throw new Error("Unexpected response from server");
   return list[0];
 }
+async function postVisitorTicketNotice(apiBaseUrl, ticketId, accessToken, kind) {
+  const base = apiBaseUrl.replace(/\/$/, "");
+  const res = await fetch(
+    `${base}/api/v1/chat-bot/auth/ticket/${encodeURIComponent(ticketId)}/notices`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`
+      },
+      body: JSON.stringify({ kind })
+    }
+  );
+  const json = await res.json();
+  if (!res.ok || json.success === false) {
+    throw new Error(
+      typeof json.message === "string" && json.message ? json.message : `Could not record notice (${res.status})`
+    );
+  }
+}
+async function postVisitorSelfServeTranscript(apiBaseUrl, ticketId, accessToken, transcript) {
+  if (!transcript.length) return;
+  const base = apiBaseUrl.replace(/\/$/, "");
+  const res = await fetch(
+    `${base}/api/v1/chat-bot/auth/ticket/${encodeURIComponent(ticketId)}/self-serve`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`
+      },
+      body: JSON.stringify({ transcript })
+    }
+  );
+  const json = await res.json();
+  if (!res.ok || json.success === false) {
+    throw new Error(
+      typeof json.message === "string" && json.message ? json.message : `Could not sync self-serve chat (${res.status})`
+    );
+  }
+}
 async function postVisitorEscalate(apiBaseUrl, body) {
   assertCompleteJwt(body.projectToken, "projectToken");
   const base = apiBaseUrl.replace(/\/$/, "");
@@ -2356,7 +2406,9 @@ function ticketMessageToWidgetMsg(m) {
       text: m.text,
       senderName: m.senderLabel || "AI Assistant",
       time,
-      sortAt
+      sortAt,
+      isStaff: false,
+      senderAvatar: null
     };
   }
   const label = m.senderLabel && m.senderLabel !== "Unknown sender" && m.senderLabel !== "System" ? m.senderLabel : "Support";
@@ -2404,9 +2456,34 @@ function compareMsgs(a, b) {
 function messageDedupeKey(m) {
   return `${m.role}|${m.text.trim().toLowerCase()}`;
 }
+function latestSortAt(messages) {
+  let max = "";
+  for (const m of messages) {
+    const t = m.sortAt ?? "";
+    if (t > max) max = t;
+  }
+  return max;
+}
 function buildVisitorThread(ticketMsgs, faqExchanges) {
   const faqMsgs = faqExchanges.flatMap(faqExchangeToMsgs);
   return [...ticketMsgs, ...faqMsgs].sort(compareMsgs);
+}
+var AGENT_ENTER_NOTICE = "You've reached our customer support agent";
+var AGENT_EXIT_NOTICE = "You've left customer support";
+function modeOfNotice(text) {
+  const t = text.trim();
+  if (t === AGENT_ENTER_NOTICE) return "enter";
+  if (t === AGENT_EXIT_NOTICE) return "exit";
+  return null;
+}
+function lastAgentModeNotice(messages) {
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const m = messages[i];
+    if (!m?.isSystem) continue;
+    const mode = modeOfNotice(String(m.text || ""));
+    if (mode) return mode;
+  }
+  return null;
 }
 function mergeLocalIntoTicketThread(ticketThread, localMsgs) {
   if (!localMsgs.length) return ticketThread;
@@ -2414,38 +2491,32 @@ function mergeLocalIntoTicketThread(ticketThread, localMsgs) {
     ticketThread.map((m) => m.id).filter((id) => Boolean(id))
   );
   const seenText = new Set(ticketThread.map(messageDedupeKey));
+  const ticketTip = latestSortAt(ticketThread);
   const extras = [];
+  const mergedSoFar = () => [...ticketThread, ...extras];
   for (const m of localMsgs) {
     if (m.ticketCreatedNotice) continue;
     if (m.id && byId.has(m.id)) continue;
-    if (m.localOnly) {
-      const already = extras.some(
+    const mode = m.isSystem ? modeOfNotice(String(m.text || "")) : null;
+    if (m.localOnly || mode) {
+      if (mode && lastAgentModeNotice(mergedSoFar()) === mode) continue;
+      if (m.localOnly && extras.some(
         (e) => e.localOnly && e.text === m.text && (e.sortAt ?? "") === (m.sortAt ?? "")
-      ) || ticketThread.some(
-        (t) => t.localOnly && t.text === m.text && (t.sortAt ?? "") === (m.sortAt ?? "")
-      );
-      if (!already) extras.push(m);
+      )) {
+        continue;
+      }
+      extras.push(m);
       continue;
     }
     const key = messageDedupeKey(m);
-    if (!m.text.trim() || seenText.has(key)) continue;
+    if (!m.text.trim()) continue;
+    const newerThanTicket = Boolean(m.sortAt && ticketTip && m.sortAt > ticketTip);
+    if (seenText.has(key) && !newerThanTicket) continue;
     seenText.add(key);
     extras.push(m);
   }
   if (!extras.length) return ticketThread;
   return [...ticketThread, ...extras].sort(compareMsgs);
-}
-var AGENT_ENTER_NOTICE = "You've reached our customer support agent";
-var AGENT_EXIT_NOTICE = "You've left customer support";
-function lastAgentModeNotice(messages) {
-  for (let i = messages.length - 1; i >= 0; i -= 1) {
-    const m = messages[i];
-    if (!m?.isSystem) continue;
-    const text = String(m.text || "").trim();
-    if (text === AGENT_ENTER_NOTICE) return "enter";
-    if (text === AGENT_EXIT_NOTICE) return "exit";
-  }
-  return null;
 }
 function pushSystemNotice(messages, text) {
   const sortAt = (/* @__PURE__ */ new Date()).toISOString();
@@ -2467,12 +2538,9 @@ function pushSystemNotice(messages, text) {
 function appendSystemNotice(messages, text) {
   const trimmed = text.trim();
   if (!trimmed) return messages;
-  if (trimmed === AGENT_ENTER_NOTICE) {
-    if (lastAgentModeNotice(messages) === "enter") return messages;
-    return pushSystemNotice(messages, trimmed);
-  }
-  if (trimmed === AGENT_EXIT_NOTICE) {
-    if (lastAgentModeNotice(messages) === "exit") return messages;
+  const mode = modeOfNotice(trimmed);
+  if (mode) {
+    if (lastAgentModeNotice(messages) === mode) return messages;
     return pushSystemNotice(messages, trimmed);
   }
   if (messages.some(
@@ -2481,6 +2549,22 @@ function appendSystemNotice(messages, text) {
     return messages;
   }
   return pushSystemNotice(messages, trimmed);
+}
+function selfServeTurnsSinceLastExit(messages) {
+  let start = 0;
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    if (messages[i]?.isSystem && modeOfNotice(String(messages[i].text || "")) === "exit") {
+      start = i + 1;
+      break;
+    }
+  }
+  return messages.slice(start).filter(
+    (m) => !m.isSystem && !m.isStaff && !m.ticketCreatedNotice && (m.role === "user" || m.role === "bot") && m.text.trim().length > 0
+  ).map((m) => ({
+    role: m.role === "user" ? "user" : "assistant",
+    content: m.text.trim(),
+    ...m.sortAt ? { at: m.sortAt } : {}
+  }));
 }
 
 // src/lib/faq-transcript.ts
@@ -2857,16 +2941,19 @@ function ChatWidget({
       const ticketMsgs = rows.map(ticketMessageToWidgetMsg);
       const faqExchanges = loadFaqTranscript(projectToken, tid);
       const ticketThread = buildVisitorThread(ticketMsgs, faqExchanges);
-      const local = loadSelfServeTranscript(
+      const stored = loadSelfServeTranscript(
         projectToken,
         visitorRef.current?.email
       );
-      const merged = mergeLocalIntoTicketThread(
-        ticketThread,
-        local.length ? local : messagesRef.current
+      const memory = messagesRef.current;
+      const localMsgs = memory.length && stored.length ? mergeLocalIntoTicketThread(stored, memory) : memory.length ? memory : stored;
+      const merged = mergeLocalIntoTicketThread(ticketThread, localMsgs);
+      const withLiveNotices = mergeLocalIntoTicketThread(
+        merged,
+        messagesRef.current
       );
       const thread = withTicketCreatedNotice(
-        merged,
+        withLiveNotices,
         projectToken,
         String(tid),
         () => (/* @__PURE__ */ new Date()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
@@ -3170,7 +3257,23 @@ function ChatWidget({
         senderName: fromFaq ? void 0 : "AI Assistant",
         ...fromFaq ? { faqLocal: true, faqForQuestion: userMsg.text } : {}
       };
-      setMessages((m) => [...m, botMsg]);
+      setMessages((m) => {
+        const next = [...m, botMsg];
+        saveSelfServeTranscript(projectToken, visitorRef.current?.email, next);
+        return next;
+      });
+      const openTid = visitorRef.current?.ticketId;
+      const openTok = visitorRef.current?.accessToken;
+      if (apiBase !== void 0 && openTid && openTok && !inTicketThread && !fromFaq) {
+        try {
+          await postVisitorSelfServeTranscript(apiBase, openTid, openTok, [
+            { role: "user", content: userMsg.text, at: sentAt },
+            { role: "assistant", content: reply, at: botAt }
+          ]);
+        } catch (err) {
+          console.warn("[ChatWidget] Could not sync AI turn to open ticket", err);
+        }
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       const reply = userFacingChatError(msg);
@@ -3609,18 +3712,36 @@ function ChatWidget({
   }
   async function handleResumeTicket() {
     if (!activeTicketId) return;
+    const tid = activeTicketId;
+    const token = visitorRef.current?.accessToken;
     saveSelfServeTranscript(
       projectToken,
       visitorRef.current?.email,
       messagesRef.current
     );
+    const pending = selfServeTurnsSinceLastExit(messagesRef.current);
+    if (apiBase !== void 0 && token && pending.length) {
+      try {
+        await postVisitorSelfServeTranscript(apiBase, tid, token, pending);
+      } catch (err) {
+        console.warn("[ChatWidget] Could not sync self-serve turns before resume", err);
+      }
+    }
+    if (apiBase !== void 0 && token) {
+      try {
+        await postVisitorTicketNotice(apiBase, tid, token, "enter");
+      } catch (err) {
+        console.warn("[ChatWidget] Could not record resume notice", err);
+      }
+    }
     setInTicketThread(true);
     setHelpOpen(false);
     await syncTicketThread();
-    setMessages((m) => appendSystemNotice(m, AGENT_ENTER_NOTICE));
   }
-  function handleExitAgentChat() {
+  async function handleExitAgentChat() {
     if (interactionLockRef.current) return;
+    const tid = visitorRef.current?.ticketId;
+    const token = visitorRef.current?.accessToken;
     setMessages((m) => {
       const next = appendSystemNotice(m, AGENT_EXIT_NOTICE);
       saveSelfServeTranscript(projectToken, visitorRef.current?.email, next);
@@ -3629,6 +3750,13 @@ function ChatWidget({
     setInTicketThread(false);
     setHelpOpen(false);
     setAllowResolvedReply(false);
+    if (apiBase !== void 0 && tid && token) {
+      try {
+        await postVisitorTicketNotice(apiBase, tid, token, "exit");
+      } catch (err) {
+        console.warn("[ChatWidget] Could not record exit notice", err);
+      }
+    }
   }
   function handleContinueResolvedConversation() {
     setAllowResolvedReply(true);
@@ -3669,7 +3797,6 @@ function ChatWidget({
         setRatingSkipped(false);
         setAllowResolvedReply(false);
         await syncTicketThread();
-        setMessages((m) => appendSystemNotice(m, AGENT_ENTER_NOTICE));
       } else {
         setMessages((m) => [
           ...m,
@@ -3979,6 +4106,7 @@ function ChatWidget({
               collectIdentity: collectIdentityOnEscalate,
               initialEmail: visitor?.email,
               initialName: visitor?.name,
+              initialSummary: lastUserMessageForEscalate(messages),
               onClose: () => setOpen(false)
             }
           )
