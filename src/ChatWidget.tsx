@@ -18,6 +18,7 @@ import {
 import type { FAQ, Msg, ChatFAQWidgetProps, ThemeSettings } from "../types/index";
 import {
   fetchWidgetConfig,
+  isWidgetConfigHardFailure,
   type WidgetCapabilities,
 } from "./lib/widget-config";
 import {
@@ -115,6 +116,13 @@ export default function ChatWidget({
   const [ratingSkipped, setRatingSkipped] = useState(false);
   const [allowResolvedReply, setAllowResolvedReply] = useState(false);
   const [widgetUnavailable, setWidgetUnavailable] = useState<string | null>(null);
+  /** When remote config is required, stay hidden until it succeeds (avoids default-theme flash). */
+  const [configReady, setConfigReady] = useState(() => {
+    const needsRemoteConfig = Boolean(
+      hasWidgetApiBase(apiBaseUrl) && projectToken?.trim(),
+    );
+    return !needsRemoteConfig;
+  });
   const [sessionReady, setSessionReady] = useState(!visitorGateEffective);
   /** Open ticket from identify shouldn't skip FAQ/AI home — only enter thread after resume/escalate. */
   const [inTicketThread, setInTicketThread] = useState(false);
@@ -158,12 +166,19 @@ export default function ChatWidget({
 
   useEffect(() => {
     const tok = projectToken?.trim();
-    if (!hasApi || apiBase === undefined || !tok) return;
+    if (!hasApi || apiBase === undefined || !tok) {
+      setConfigReady(true);
+      setWidgetUnavailable(null);
+      return;
+    }
 
     let cancelled = false;
-    (async () => {
+    setConfigReady(false);
+    setWidgetUnavailable(null);
+
+    const applyConfig = async (opts?: { initial?: boolean }) => {
+      const initial = opts?.initial === true;
       try {
-        setWidgetUnavailable(null);
         const config = await fetchWidgetConfig(apiBase, tok);
         if (cancelled) return;
         setThemeSettings((prev) => ({
@@ -173,28 +188,45 @@ export default function ChatWidget({
         }));
         setRemoteFaqs(config.faqs);
         setCapabilities(config.capabilities);
+        setWidgetUnavailable(null);
+        setConfigReady(true);
       } catch (err) {
         if (cancelled) return;
-        const msg = err instanceof Error ? err.message : "";
-        if (
-          msg.includes("inactive") ||
-          msg.includes("no longer available") ||
-          msg.includes("has been removed")
-        ) {
-          setWidgetUnavailable(msg);
+        const msg = err instanceof Error ? err.message : String(err);
+        // First load: any failure hides the widget (no default-theme flash).
+        // Later: only hard failures (inactive / deleted / unauthorized) hide it.
+        if (initial || isWidgetConfigHardFailure(err)) {
           setRemoteFaqs([]);
-          return;
+          setWidgetUnavailable(msg || "Widget configuration unavailable");
+          setConfigReady(false);
+          setOpen(false);
         }
-        setRemoteFaqs([]);
         console.warn(
           "[ChatWidget] Could not load widget config (appearance + FAQs). " +
-            "Check VITE_API_URL, VITE_PROJECT_TOKEN (full JWT from Admin → Projects), and that the backend is running.",
-          err
+            "Check API URL, project embed token, project domain vs site origin, and that the backend is running.",
+          err,
         );
       }
-    })();
+    };
+
+    void applyConfig({ initial: true });
+
+    // Re-check so disabling/deleting a project hides the widget without a full refresh.
+    const intervalId = window.setInterval(() => {
+      void applyConfig({ initial: false });
+    }, 60_000);
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        void applyConfig({ initial: false });
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
     return () => {
       cancelled = true;
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [apiBase, hasApi, projectToken]);
 
@@ -1302,7 +1334,7 @@ export default function ChatWidget({
     }
   }
 
-  if (widgetUnavailable && hasApi && projectToken?.trim()) {
+  if (hasApi && projectToken?.trim() && (!configReady || widgetUnavailable)) {
     return null;
   }
 

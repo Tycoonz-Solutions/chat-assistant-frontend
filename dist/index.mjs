@@ -2070,6 +2070,21 @@ var POSITIONS = /* @__PURE__ */ new Set([
   "top-right",
   "top-left"
 ]);
+var WidgetConfigError = class extends Error {
+  status;
+  constructor(message, status) {
+    super(message);
+    this.name = "WidgetConfigError";
+    this.status = status;
+  }
+};
+function isWidgetConfigHardFailure(err) {
+  if (err instanceof WidgetConfigError) {
+    return err.status === 401 || err.status === 403;
+  }
+  const msg = err instanceof Error ? err.message.toLowerCase() : String(err).toLowerCase();
+  return msg.includes("inactive") || msg.includes("no longer available") || msg.includes("has been removed") || msg.includes("not authorized") || msg.includes("invalid or revoked") || msg.includes("invalid or expired");
+}
 var DEFAULT_CAPABILITIES = {
   aiChatEnabled: true,
   agentSupportEnabled: true
@@ -2127,21 +2142,24 @@ async function fetchWidgetConfig(apiBaseUrl, projectToken) {
     const status = res.status;
     const serverMsg = typeof json.message === "string" && json.message ? json.message : "";
     if (status === 403) {
-      throw new Error(
-        serverMsg || "This organisation is inactive. The chat widget is not available right now."
+      throw new WidgetConfigError(
+        serverMsg || "This organisation is inactive. The chat widget is not available right now.",
+        status
       );
     }
     if (status === 401) {
-      throw new Error(
-        serverMsg || "Project token is invalid or expired. Copy a fresh token from Admin \u2192 Projects."
+      throw new WidgetConfigError(
+        serverMsg || "Project token is invalid or expired. Copy a fresh token from Admin \u2192 Projects.",
+        status
       );
     }
     if (status === 503) {
-      throw new Error(
-        serverMsg || "Server cannot reach the database right now. Check MongoDB Atlas and your network, then refresh."
+      throw new WidgetConfigError(
+        serverMsg || "Server cannot reach the database right now. Check MongoDB Atlas and your network, then refresh.",
+        status
       );
     }
-    throw new Error(serverMsg || `Widget config failed (${status})`);
+    throw new WidgetConfigError(serverMsg || `Widget config failed (${status})`, status);
   }
   const data = json.data;
   const attrs = data?.attributes ?? {};
@@ -2806,6 +2824,12 @@ function ChatWidget({
   const [ratingSkipped, setRatingSkipped] = useState4(false);
   const [allowResolvedReply, setAllowResolvedReply] = useState4(false);
   const [widgetUnavailable, setWidgetUnavailable] = useState4(null);
+  const [configReady, setConfigReady] = useState4(() => {
+    const needsRemoteConfig = Boolean(
+      hasWidgetApiBase(apiBaseUrl) && projectToken?.trim()
+    );
+    return !needsRemoteConfig;
+  });
   const [sessionReady, setSessionReady] = useState4(!visitorGateEffective);
   const [inTicketThread, setInTicketThread] = useState4(false);
   const interactionLockRef = useRef2(false);
@@ -2840,11 +2864,17 @@ function ChatWidget({
   themeSettingsPropRef.current = themeSettingsProp;
   useEffect2(() => {
     const tok = projectToken?.trim();
-    if (!hasApi || apiBase === void 0 || !tok) return;
+    if (!hasApi || apiBase === void 0 || !tok) {
+      setConfigReady(true);
+      setWidgetUnavailable(null);
+      return;
+    }
     let cancelled = false;
-    (async () => {
+    setConfigReady(false);
+    setWidgetUnavailable(null);
+    const applyConfig = async (opts) => {
+      const initial = opts?.initial === true;
       try {
-        setWidgetUnavailable(null);
         const config = await fetchWidgetConfig(apiBase, tok);
         if (cancelled) return;
         setThemeSettings((prev) => ({
@@ -2854,23 +2884,37 @@ function ChatWidget({
         }));
         setRemoteFaqs(config.faqs);
         setCapabilities(config.capabilities);
+        setWidgetUnavailable(null);
+        setConfigReady(true);
       } catch (err) {
         if (cancelled) return;
-        const msg = err instanceof Error ? err.message : "";
-        if (msg.includes("inactive") || msg.includes("no longer available") || msg.includes("has been removed")) {
-          setWidgetUnavailable(msg);
+        const msg = err instanceof Error ? err.message : String(err);
+        if (initial || isWidgetConfigHardFailure(err)) {
           setRemoteFaqs([]);
-          return;
+          setWidgetUnavailable(msg || "Widget configuration unavailable");
+          setConfigReady(false);
+          setOpen(false);
         }
-        setRemoteFaqs([]);
         console.warn(
-          "[ChatWidget] Could not load widget config (appearance + FAQs). Check VITE_API_URL, VITE_PROJECT_TOKEN (full JWT from Admin \u2192 Projects), and that the backend is running.",
+          "[ChatWidget] Could not load widget config (appearance + FAQs). Check API URL, project embed token, project domain vs site origin, and that the backend is running.",
           err
         );
       }
-    })();
+    };
+    void applyConfig({ initial: true });
+    const intervalId = window.setInterval(() => {
+      void applyConfig({ initial: false });
+    }, 6e4);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        void applyConfig({ initial: false });
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       cancelled = true;
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [apiBase, hasApi, projectToken]);
   const faqs = useMemo(() => {
@@ -3827,7 +3871,7 @@ function ChatWidget({
       setEscalateBusy(false);
     }
   }
-  if (widgetUnavailable && hasApi && projectToken?.trim()) {
+  if (hasApi && projectToken?.trim() && (!configReady || widgetUnavailable)) {
     return null;
   }
   return /* @__PURE__ */ jsxs12(Fragment5, { children: [

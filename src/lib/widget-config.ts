@@ -20,6 +20,32 @@ export type WidgetConfig = {
   capabilities: WidgetCapabilities;
 };
 
+export class WidgetConfigError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "WidgetConfigError";
+    this.status = status;
+  }
+}
+
+/** 401/403 — project inactive, deleted, bad token, or domain blocked. */
+export function isWidgetConfigHardFailure(err: unknown): boolean {
+  if (err instanceof WidgetConfigError) {
+    return err.status === 401 || err.status === 403;
+  }
+  const msg = err instanceof Error ? err.message.toLowerCase() : String(err).toLowerCase();
+  return (
+    msg.includes("inactive") ||
+    msg.includes("no longer available") ||
+    msg.includes("has been removed") ||
+    msg.includes("not authorized") ||
+    msg.includes("invalid or revoked") ||
+    msg.includes("invalid or expired")
+  );
+}
+
 const DEFAULT_CAPABILITIES: WidgetCapabilities = {
   aiChatEnabled: true,
   agentSupportEnabled: true,
@@ -68,7 +94,8 @@ function parseAppearanceAttributes(a: Record<string, unknown>): Partial<ThemeSet
     out.fontSizeBase = fontSizeBase as ThemeSettings["fontSizeBase"];
   }
   const position = a.position;
-  if (typeof a.position === "string" &&
+  if (
+    typeof a.position === "string" &&
     POSITIONS.has(position as NonNullable<ThemeSettings["position"]>)
   ) {
     out.position = position as ThemeSettings["position"];
@@ -99,24 +126,27 @@ export async function fetchWidgetConfig(
     const serverMsg =
       typeof json.message === "string" && json.message ? json.message : "";
     if (status === 403) {
-      throw new Error(
+      throw new WidgetConfigError(
         serverMsg ||
-          "This organisation is inactive. The chat widget is not available right now."
+          "This organisation is inactive. The chat widget is not available right now.",
+        status,
       );
     }
     if (status === 401) {
-      throw new Error(
+      throw new WidgetConfigError(
         serverMsg ||
-          "Project token is invalid or expired. Copy a fresh token from Admin → Projects."
+          "Project token is invalid or expired. Copy a fresh token from Admin → Projects.",
+        status,
       );
     }
     if (status === 503) {
-      throw new Error(
+      throw new WidgetConfigError(
         serverMsg ||
-          "Server cannot reach the database right now. Check MongoDB Atlas and your network, then refresh."
+          "Server cannot reach the database right now. Check MongoDB Atlas and your network, then refresh.",
+        status,
       );
     }
-    throw new Error(serverMsg || `Widget config failed (${status})`);
+    throw new WidgetConfigError(serverMsg || `Widget config failed (${status})`, status);
   }
 
   const data = json.data as { attributes?: Record<string, unknown> } | undefined;
