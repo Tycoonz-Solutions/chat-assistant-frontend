@@ -1235,8 +1235,17 @@ export default function ChatWidget({
       }
       if (apiBase !== undefined && token) {
         try {
-          const notice = await postVisitorTicketNotice(apiBase, tid, token, "enter");
-          if (notice) appendModeNoticeFromApi(notice);
+          // Escalate already writes the first "reached" notice — only append on
+          // a real re-enter after leave (avoids duplicate reach mid-thread).
+          if (lastAgentModeNotice(messagesRef.current) !== "enter") {
+            const notice = await postVisitorTicketNotice(
+              apiBase,
+              tid,
+              token,
+              "enter",
+            );
+            if (notice) appendModeNoticeFromApi(notice);
+          }
         } catch (err) {
           console.warn("[ChatWidget] Could not record resume notice", err);
         }

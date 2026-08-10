@@ -2593,9 +2593,13 @@ function preservePendingModeNotices(ticketThread, liveMsgs) {
     ticketThread.map((m) => m.id).filter((id) => Boolean(id))
   );
   const tip = latestSortAt(ticketThread);
+  const ticketMode = lastAgentModeNotice(ticketThread);
   const pending = liveMsgs.filter((m) => {
-    if (!m.isSystem || !modeOfNotice(String(m.text || ""))) return false;
+    if (!m.isSystem) return false;
+    const mode = modeOfNotice(String(m.text || ""));
+    if (!mode) return false;
     if (m.id && byId.has(m.id)) return false;
+    if (ticketMode === mode) return false;
     if (!m.id && m.sortAt && tip && m.sortAt <= tip) return false;
     if (!m.id && !m.sortAt) return false;
     return true;
@@ -3842,8 +3846,15 @@ function ChatWidget({
       }
       if (apiBase !== void 0 && token) {
         try {
-          const notice = await postVisitorTicketNotice(apiBase, tid, token, "enter");
-          if (notice) appendModeNoticeFromApi(notice);
+          if (lastAgentModeNotice(messagesRef.current) !== "enter") {
+            const notice = await postVisitorTicketNotice(
+              apiBase,
+              tid,
+              token,
+              "enter"
+            );
+            if (notice) appendModeNoticeFromApi(notice);
+          }
         } catch (err) {
           console.warn("[ChatWidget] Could not record resume notice", err);
         }

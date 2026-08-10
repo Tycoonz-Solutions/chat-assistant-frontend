@@ -194,6 +194,7 @@ export function dedupeAdjacentModeNotices(messages: Msg[]): Msg[] {
 /**
  * Keep enter/exit notices that were just posted but may be missing from a racing
  * ticket fetch (stale response would otherwise wipe them from the UI).
+ * Never re-inject a mode notice when the ticket is already in that mode.
  */
 export function preservePendingModeNotices(
   ticketThread: Msg[],
@@ -205,10 +206,14 @@ export function preservePendingModeNotices(
     ticketThread.map((m) => m.id).filter((id): id is string => Boolean(id)),
   );
   const tip = latestSortAt(ticketThread);
+  const ticketMode = lastAgentModeNotice(ticketThread);
   const pending = liveMsgs.filter((m) => {
-    if (!m.isSystem || !modeOfNotice(String(m.text || ""))) return false;
+    if (!m.isSystem) return false;
+    const mode = modeOfNotice(String(m.text || ""));
+    if (!mode) return false;
     if (m.id && byId.has(m.id)) return false;
-    // Prefer id-based keep; also keep optimistic rows newer than the ticket tip.
+    // Ticket already ends in this mode — don't paste a second "reached"/"left".
+    if (ticketMode === mode) return false;
     if (!m.id && m.sortAt && tip && m.sortAt <= tip) return false;
     if (!m.id && !m.sortAt) return false;
     return true;
