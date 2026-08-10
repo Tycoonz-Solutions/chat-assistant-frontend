@@ -38,6 +38,7 @@ import {
   dedupeAdjacentModeNotices,
   lastAgentModeNotice,
   mergeLocalIntoTicketThread,
+  preservePendingModeNotices,
   selfServeTurnsSinceLastExit,
   ticketMessageToWidgetMsg,
 } from "./lib/ticket-thread-ui";
@@ -297,11 +298,15 @@ export default function ChatWidget({
           : Promise.resolve(null),
       ]);
       // Ticket messages are the timeline. Local storage only fills unsynced AI/FAQ turns.
+      const liveBeforeSync = messagesRef.current;
       const ticketMsgs = dedupeAdjacentModeNotices(
         rows.map(ticketMessageToWidgetMsg),
       );
       const faqExchanges = loadFaqTranscript(projectToken, tid);
-      const ticketThread = buildVisitorThread(ticketMsgs, faqExchanges);
+      const ticketThread = preservePendingModeNotices(
+        buildVisitorThread(ticketMsgs, faqExchanges),
+        liveBeforeSync,
+      );
       const stored = loadSelfServeTranscript(
         projectToken,
         visitorRef.current?.email,
@@ -315,7 +320,10 @@ export default function ChatWidget({
             : stored;
       const merged = mergeLocalIntoTicketThread(ticketThread, localMsgs);
       const thread = withTicketCreatedNotice(
-        dedupeAdjacentModeNotices(merged),
+        preservePendingModeNotices(
+          dedupeAdjacentModeNotices(merged),
+          messagesRef.current,
+        ),
         projectToken,
         String(tid),
         () =>
@@ -1235,8 +1243,7 @@ export default function ChatWidget({
       }
 
       setInTicketThread(true);
-      // Reconcile in the background; notice is already on screen from the POST.
-      void syncTicketThread();
+      await syncTicketThread();
     } finally {
       releaseInteractionLock();
     }
@@ -1259,7 +1266,8 @@ export default function ChatWidget({
         }
       }
       setInTicketThread(false);
-      void syncTicketThread();
+      // Await so a stale in-flight sync can't finish afterward and drop the leave notice.
+      await syncTicketThread();
     } finally {
       releaseInteractionLock();
     }

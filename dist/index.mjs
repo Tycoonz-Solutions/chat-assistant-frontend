@@ -2545,6 +2545,24 @@ function dedupeAdjacentModeNotices(messages) {
   }
   return out;
 }
+function preservePendingModeNotices(ticketThread, liveMsgs) {
+  if (!liveMsgs.length) return ticketThread;
+  const byId = new Set(
+    ticketThread.map((m) => m.id).filter((id) => Boolean(id))
+  );
+  const tip = latestSortAt(ticketThread);
+  const pending = liveMsgs.filter((m) => {
+    if (!m.isSystem || !modeOfNotice(String(m.text || ""))) return false;
+    if (m.id && byId.has(m.id)) return false;
+    if (!m.id && m.sortAt && tip && m.sortAt <= tip) return false;
+    if (!m.id && !m.sortAt) return false;
+    return true;
+  });
+  if (!pending.length) return ticketThread;
+  return dedupeAdjacentModeNotices(
+    [...ticketThread, ...pending].sort(compareMsgs)
+  );
+}
 function selfServeTurnsSinceLastExit(messages) {
   let start = 0;
   for (let i = messages.length - 1; i >= 0; i -= 1) {
@@ -2965,11 +2983,15 @@ function ChatWidget({
         listVisitorTicketMessages(apiBase, tid, token),
         wantSummary ? getVisitorTicket(apiBase, tid, token) : Promise.resolve(null)
       ]);
+      const liveBeforeSync = messagesRef.current;
       const ticketMsgs = dedupeAdjacentModeNotices(
         rows.map(ticketMessageToWidgetMsg)
       );
       const faqExchanges = loadFaqTranscript(projectToken, tid);
-      const ticketThread = buildVisitorThread(ticketMsgs, faqExchanges);
+      const ticketThread = preservePendingModeNotices(
+        buildVisitorThread(ticketMsgs, faqExchanges),
+        liveBeforeSync
+      );
       const stored = loadSelfServeTranscript(
         projectToken,
         visitorRef.current?.email
@@ -2978,7 +3000,10 @@ function ChatWidget({
       const localMsgs = memory.length && stored.length ? mergeLocalIntoTicketThread(stored, memory) : memory.length ? memory : stored;
       const merged = mergeLocalIntoTicketThread(ticketThread, localMsgs);
       const thread = withTicketCreatedNotice(
-        dedupeAdjacentModeNotices(merged),
+        preservePendingModeNotices(
+          dedupeAdjacentModeNotices(merged),
+          messagesRef.current
+        ),
         projectToken,
         String(tid),
         () => (/* @__PURE__ */ new Date()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
@@ -3782,7 +3807,7 @@ function ChatWidget({
         }
       }
       setInTicketThread(true);
-      void syncTicketThread();
+      await syncTicketThread();
     } finally {
       releaseInteractionLock();
     }
@@ -3803,7 +3828,7 @@ function ChatWidget({
         }
       }
       setInTicketThread(false);
-      void syncTicketThread();
+      await syncTicketThread();
     } finally {
       releaseInteractionLock();
     }

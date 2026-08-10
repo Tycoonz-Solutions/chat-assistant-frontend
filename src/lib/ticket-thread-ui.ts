@@ -192,6 +192,35 @@ export function dedupeAdjacentModeNotices(messages: Msg[]): Msg[] {
 }
 
 /**
+ * Keep enter/exit notices that were just posted but may be missing from a racing
+ * ticket fetch (stale response would otherwise wipe them from the UI).
+ */
+export function preservePendingModeNotices(
+  ticketThread: Msg[],
+  liveMsgs: Msg[],
+): Msg[] {
+  if (!liveMsgs.length) return ticketThread;
+
+  const byId = new Set(
+    ticketThread.map((m) => m.id).filter((id): id is string => Boolean(id)),
+  );
+  const tip = latestSortAt(ticketThread);
+  const pending = liveMsgs.filter((m) => {
+    if (!m.isSystem || !modeOfNotice(String(m.text || ""))) return false;
+    if (m.id && byId.has(m.id)) return false;
+    // Prefer id-based keep; also keep optimistic rows newer than the ticket tip.
+    if (!m.id && m.sortAt && tip && m.sortAt <= tip) return false;
+    if (!m.id && !m.sortAt) return false;
+    return true;
+  });
+
+  if (!pending.length) return ticketThread;
+  return dedupeAdjacentModeNotices(
+    [...ticketThread, ...pending].sort(compareMsgs),
+  );
+}
+
+/**
  * Append a non-mode system divider locally (e.g. rare UI-only notices).
  * Enter/exit must be written via the ticket notices API — not sessionStorage.
  */
