@@ -101,9 +101,7 @@ export default function WidgetMainView({
     ticketResolved && feedbackComplete && hasActiveTicket;
   const showComposer =
     (!ticketResolved || allowResolvedReply) &&
-    (hasActiveTicket ||
-      messages.some((m) => m.role === "user") ||
-      aiChatAvailable);
+    (hasActiveTicket || aiChatAvailable);
   /** FAQs visible in the main area before the user starts chatting */
   const showInlineFaqs =
     !hasActiveTicket && messages.length === 0 && !helpOpen && faqs.length > 0;

@@ -17,6 +17,7 @@ export default function WelcomeScreen({
   canEscalate,
   onCreateSupportTicket,
   interactionLocked = false,
+  aiChatAvailable = false,
   onClose,
 }: {
   styles: any;
@@ -30,6 +31,7 @@ export default function WelcomeScreen({
   themeSettings: ThemeSettings;
   canEscalate?: boolean;
   onCreateSupportTicket?: () => void;
+  aiChatAvailable?: boolean;
   onClose?: () => void;
 }) {
   const { headline, subtitle } = resolveWelcomeCopy(themeSettings);
@@ -99,7 +101,7 @@ export default function WelcomeScreen({
           overflow: "hidden",
         }}
       >
-
+        {faqs.length > 0 ? (
         <div style={styles.faqContainer} className="chat-widget-faq-container">
           <div style={{
             display: 'flex',
@@ -129,21 +131,6 @@ export default function WelcomeScreen({
               overflowY: "auto" as const,
             }}
           >
-            {faqs.length === 0 ? (
-              <p
-                style={{
-                  margin: 0,
-                  padding: '12px 8px',
-                  fontSize: themeSettings?.fontSizeBase
-                    ? themeSettings.fontSizeBase / 2
-                    : 14,
-                  color: themeSettings?.isDarkMode ? '#aaa' : '#64748b',
-                  textAlign: 'center',
-                }}
-              >
-                No FAQs yet for this project. Add them in the admin under FAQs/Knowledge Base.
-              </p>
-            ) : null}
             {faqs.map((faq, index) => (
               <button
                 key={index}
@@ -188,8 +175,10 @@ export default function WelcomeScreen({
             ))}
           </div>
         </div>
+        ) : null}
       </div>
 
+      {aiChatAvailable ? (
       <div style={styles.inputArea}>
         <form onSubmit={onSend}>
           <div style={styles.inputWrapper}>
@@ -215,6 +204,7 @@ export default function WelcomeScreen({
           </div>
         </form>
       </div>
+      ) : null}
     </div>
   );
 }

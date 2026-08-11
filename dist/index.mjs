@@ -122,6 +122,7 @@ function WelcomeScreen({
   canEscalate,
   onCreateSupportTicket,
   interactionLocked = false,
+  aiChatAvailable = false,
   onClose
 }) {
   const { headline, subtitle } = resolveWelcomeCopy(themeSettings);
@@ -187,7 +188,7 @@ function WelcomeScreen({
           marginTop: -24,
           overflow: "hidden"
         },
-        children: /* @__PURE__ */ jsxs("div", { style: styles.faqContainer, className: "chat-widget-faq-container", children: [
+        children: faqs.length > 0 ? /* @__PURE__ */ jsxs("div", { style: styles.faqContainer, className: "chat-widget-faq-container", children: [
           /* @__PURE__ */ jsxs("div", { style: {
             display: "flex",
             alignItems: "center",
@@ -199,7 +200,7 @@ function WelcomeScreen({
             themeSettings.isGradient ? /* @__PURE__ */ jsx3(GradientIcon, { themeSettings }) : /* @__PURE__ */ jsx3(List, { size: 20, color: themeSettings.primaryColor }),
             /* @__PURE__ */ jsx3("h3", { style: { margin: 0, fontSize: themeSettings?.fontSizeBase ? themeSettings?.fontSizeBase / 2 + 4 : 16, fontWeight: 600, color: themeSettings?.isDarkMode ? "#fff" : "#1a1a1a" }, children: "Quick FAQs" })
           ] }),
-          /* @__PURE__ */ jsxs(
+          /* @__PURE__ */ jsx3(
             "div",
             {
               className: "hide-scrollbar",
@@ -211,70 +212,55 @@ function WelcomeScreen({
                 minHeight: 0,
                 overflowY: "auto"
               },
-              children: [
-                faqs.length === 0 ? /* @__PURE__ */ jsx3(
-                  "p",
-                  {
-                    style: {
-                      margin: 0,
-                      padding: "12px 8px",
-                      fontSize: themeSettings?.fontSizeBase ? themeSettings.fontSizeBase / 2 : 14,
-                      color: themeSettings?.isDarkMode ? "#aaa" : "#64748b",
-                      textAlign: "center"
-                    },
-                    children: "No FAQs yet for this project. Add them in the admin under FAQs/Knowledge Base."
-                  }
-                ) : null,
-                faqs.map((faq, index) => /* @__PURE__ */ jsx3(
-                  "button",
-                  {
-                    type: "button",
-                    disabled: interactionLocked,
-                    style: {
-                      ...styles.faqCard,
-                      opacity: interactionLocked ? 0.55 : 1,
-                      cursor: interactionLocked ? "not-allowed" : "pointer"
-                    },
-                    onClick: () => {
-                      if (interactionLocked) return;
-                      onSelectFAQ(faq);
-                    },
-                    onMouseEnter: (e) => {
-                      e.currentTarget.style.border = `1px solid ${themeSettings.isDarkMode ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.1)"}`;
-                    },
-                    onMouseLeave: (e) => {
-                      e.currentTarget.style.border = "1px solid transparent";
-                    },
-                    children: /* @__PURE__ */ jsxs("div", { style: {
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: "4px 10px",
-                      cursor: "pointer"
-                    }, children: [
-                      /* @__PURE__ */ jsx3("span", { style: {
-                        fontSize: themeSettings?.fontSizeBase ? themeSettings?.fontSizeBase / 2 + 2 : 16,
-                        color: index === 0 ? themeSettings?.isDarkMode ? "#fff" : "#1a1a1a" : themeSettings?.isDarkMode ? "#ccc" : "#4a5568",
-                        fontWeight: index === 0 ? 600 : 500,
-                        textAlign: "left",
-                        flex: 1
-                      }, children: faq.question }),
-                      getThemedIcon({
-                        Icon: ChevronRight,
-                        size: 20,
-                        themeSettings
-                      })
-                    ] })
+              children: faqs.map((faq, index) => /* @__PURE__ */ jsx3(
+                "button",
+                {
+                  type: "button",
+                  disabled: interactionLocked,
+                  style: {
+                    ...styles.faqCard,
+                    opacity: interactionLocked ? 0.55 : 1,
+                    cursor: interactionLocked ? "not-allowed" : "pointer"
                   },
-                  index
-                ))
-              ]
+                  onClick: () => {
+                    if (interactionLocked) return;
+                    onSelectFAQ(faq);
+                  },
+                  onMouseEnter: (e) => {
+                    e.currentTarget.style.border = `1px solid ${themeSettings.isDarkMode ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.1)"}`;
+                  },
+                  onMouseLeave: (e) => {
+                    e.currentTarget.style.border = "1px solid transparent";
+                  },
+                  children: /* @__PURE__ */ jsxs("div", { style: {
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "4px 10px",
+                    cursor: "pointer"
+                  }, children: [
+                    /* @__PURE__ */ jsx3("span", { style: {
+                      fontSize: themeSettings?.fontSizeBase ? themeSettings?.fontSizeBase / 2 + 2 : 16,
+                      color: index === 0 ? themeSettings?.isDarkMode ? "#fff" : "#1a1a1a" : themeSettings?.isDarkMode ? "#ccc" : "#4a5568",
+                      fontWeight: index === 0 ? 600 : 500,
+                      textAlign: "left",
+                      flex: 1
+                    }, children: faq.question }),
+                    getThemedIcon({
+                      Icon: ChevronRight,
+                      size: 20,
+                      themeSettings
+                    })
+                  ] })
+                },
+                index
+              ))
             }
           )
-        ] })
+        ] }) : null
       }
     ),
-    /* @__PURE__ */ jsx3("div", { style: styles.inputArea, children: /* @__PURE__ */ jsx3("form", { onSubmit: onSend, children: /* @__PURE__ */ jsxs("div", { style: styles.inputWrapper, children: [
+    aiChatAvailable ? /* @__PURE__ */ jsx3("div", { style: styles.inputArea, children: /* @__PURE__ */ jsx3("form", { onSubmit: onSend, children: /* @__PURE__ */ jsxs("div", { style: styles.inputWrapper, children: [
       /* @__PURE__ */ jsx3(
         "input",
         {
@@ -302,7 +288,7 @@ function WelcomeScreen({
           ]
         }
       )
-    ] }) }) })
+    ] }) }) }) : null
   ] });
 }
 function GradientIcon({ themeSettings }) {
@@ -718,6 +704,7 @@ function ChatScreen({
   canEscalate,
   onContactSupport,
   interactionLocked = false,
+  aiChatAvailable = false,
   apiBaseUrl,
   onClose
 }) {
@@ -838,7 +825,7 @@ function ChatScreen({
         )
       }
     ) : null,
-    /* @__PURE__ */ jsx7(
+    aiChatAvailable ? /* @__PURE__ */ jsx7(
       InputArea,
       {
         styles,
@@ -848,7 +835,7 @@ function ChatScreen({
         loading: Boolean(showTyping || sending || interactionLocked),
         themeSettings
       }
-    )
+    ) : null
   ] });
 }
 
@@ -1321,7 +1308,7 @@ function WidgetMainView({
   const { headline, subtitle } = resolveWelcomeCopy(themeSettings);
   const feedbackComplete = ratingSubmitted || !showRatingPrompt;
   const showResolvedActions = ticketResolved && feedbackComplete && hasActiveTicket;
-  const showComposer = (!ticketResolved || allowResolvedReply) && (hasActiveTicket || messages.some((m) => m.role === "user") || aiChatAvailable);
+  const showComposer = (!ticketResolved || allowResolvedReply) && (hasActiveTicket || aiChatAvailable);
   const showInlineFaqs = !hasActiveTicket && messages.length === 0 && !helpOpen && faqs.length > 0;
   const showHelpChip = faqs.length > 0 && !showInlineFaqs && !hasActiveTicket;
   const showWelcomePanel = !hasActiveTicket && messages.length === 0 && !ticketResolved;
@@ -2952,12 +2939,14 @@ function ChatWidget({
   const persistConversationRef = useRef2(true);
   const hasAiBackend = Boolean(sendMessage);
   const aiChatAvailable = capabilities.aiChatEnabled && hasAiBackend;
+  const agentAvailable = Boolean(
+    capabilities.agentSupportEnabled && hasApi && projectToken?.trim()
+  );
   const activeTicketId = visitor?.ticketId ?? null;
   const viewingTicketThread = Boolean(activeTicketId && inTicketThread);
-  const resumableTicketId = activeTicketId && !inTicketThread ? activeTicketId : null;
-  const canEscalate = Boolean(
-    hasApi && projectToken?.trim() && capabilities.agentSupportEnabled && !activeTicketId
-  );
+  const resumableTicketId = agentAvailable && activeTicketId && !inTicketThread ? activeTicketId : null;
+  const canEscalate = Boolean(agentAvailable && !activeTicketId);
+  const hasAnyWidgetSurface = faqs.length > 0 || aiChatAvailable || agentAvailable || Boolean(activeTicketId);
   const visitorAccessToken = visitor?.accessToken ?? null;
   const ticketSyncInFlightRef = useRef2(false);
   const ticketSyncQueuedRef = useRef2(false);
@@ -3234,6 +3223,12 @@ function ChatWidget({
   useEffect2(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, awaitingBot]);
+  useEffect2(() => {
+    if (!agentAvailable && view === "escalate") {
+      setHelpOpen(false);
+      setView(visitorGateEffective ? "main" : "welcome");
+    }
+  }, [agentAvailable, view, visitorGateEffective]);
   const nowTime = () => (/* @__PURE__ */ new Date()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   function matchFaqAnswer(userText) {
     const q = userText.trim().toLowerCase();
@@ -3279,6 +3274,9 @@ function ChatWidget({
         } finally {
           setSending(false);
         }
+        return;
+      }
+      if (!aiChatAvailable && !matchFaqAnswer(text.trim())) {
         return;
       }
       const sentAt = (/* @__PURE__ */ new Date()).toISOString();
@@ -3910,6 +3908,9 @@ function ChatWidget({
   if (hasApi && projectToken?.trim() && (!configReady || widgetUnavailable)) {
     return null;
   }
+  if (configReady && !hasAnyWidgetSurface) {
+    return null;
+  }
   return /* @__PURE__ */ jsxs12(Fragment5, { children: [
     /* @__PURE__ */ jsx15("style", { children: `
         .hide-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
@@ -4152,6 +4153,7 @@ function ChatWidget({
               },
               themeSettings,
               canEscalate,
+              aiChatAvailable,
               onCreateSupportTicket: () => setView("escalate"),
               onClose: () => setOpen(false)
             }
@@ -4172,12 +4174,13 @@ function ChatWidget({
               messagesEndRef,
               themeSettings,
               canEscalate,
+              aiChatAvailable,
               onContactSupport: () => setView("escalate"),
               apiBaseUrl: apiBase,
               onClose: () => setOpen(false)
             }
           ) : null,
-          view === "escalate" && /* @__PURE__ */ jsx15(
+          view === "escalate" && agentAvailable ? /* @__PURE__ */ jsx15(
             EscalateScreen,
             {
               styles,
@@ -4195,7 +4198,7 @@ function ChatWidget({
               initialSummary: lastUserMessageForEscalate(messages),
               onClose: () => setOpen(false)
             }
-          )
+          ) : null
         ]
       }
     )

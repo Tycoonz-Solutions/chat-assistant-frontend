@@ -21,6 +21,7 @@ export default function ChatScreen({
   canEscalate,
   onContactSupport,
   interactionLocked = false,
+  aiChatAvailable = false,
   apiBaseUrl,
   onClose,
 }: {
@@ -38,6 +39,7 @@ export default function ChatScreen({
   themeSettings: ThemeSettings;
   canEscalate?: boolean;
   onContactSupport?: () => void;
+  aiChatAvailable?: boolean;
   apiBaseUrl?: string;
   onClose?: () => void;
 }) {
@@ -155,6 +157,7 @@ export default function ChatScreen({
         </div>
       ) : null}
 
+      {aiChatAvailable ? (
       <InputArea
         styles={styles as never}
         text={text}
@@ -163,6 +166,7 @@ export default function ChatScreen({
         loading={Boolean(showTyping || sending || interactionLocked)}
         themeSettings={themeSettings}
       />
+      ) : null}
     </div>
   );
 }

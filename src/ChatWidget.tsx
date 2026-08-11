@@ -247,17 +247,20 @@ export default function ChatWidget({
   const hasAiBackend = Boolean(sendMessage);
   const aiChatAvailable =
     capabilities.aiChatEnabled && hasAiBackend;
+  const agentAvailable = Boolean(
+    capabilities.agentSupportEnabled && hasApi && projectToken?.trim(),
+  );
   const activeTicketId = visitor?.ticketId ?? null;
   const viewingTicketThread = Boolean(activeTicketId && inTicketThread);
   const resumableTicketId =
-    activeTicketId && !inTicketThread ? activeTicketId : null;
+    agentAvailable && activeTicketId && !inTicketThread ? activeTicketId : null;
   // One open ticket at a time — no second escalate while one exists.
-  const canEscalate = Boolean(
-    hasApi &&
-      projectToken?.trim() &&
-      capabilities.agentSupportEnabled &&
-      !activeTicketId,
-  );
+  const canEscalate = Boolean(agentAvailable && !activeTicketId);
+  const hasAnyWidgetSurface =
+    faqs.length > 0 ||
+    aiChatAvailable ||
+    agentAvailable ||
+    Boolean(activeTicketId);
 
   const visitorAccessToken = visitor?.accessToken ?? null;
 
@@ -595,6 +598,13 @@ export default function ChatWidget({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, awaitingBot]);
 
+  useEffect(() => {
+    if (!agentAvailable && view === "escalate") {
+      setHelpOpen(false);
+      setView(visitorGateEffective ? "main" : "welcome");
+    }
+  }, [agentAvailable, view, visitorGateEffective]);
+
   const nowTime = () =>
     new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
@@ -649,6 +659,11 @@ export default function ChatWidget({
         } finally {
           setSending(false);
         }
+        return;
+      }
+
+      // Free-text is AI (or FAQ match). If AI is off, don't show a dead composer path.
+      if (!aiChatAvailable && !matchFaqAnswer(text.trim())) {
         return;
       }
 
@@ -1355,6 +1370,10 @@ export default function ChatWidget({
     return null;
   }
 
+  if (configReady && !hasAnyWidgetSurface) {
+    return null;
+  }
+
   return (
     <>
       <style>{`
@@ -1596,6 +1615,7 @@ export default function ChatWidget({
             }}
             themeSettings={themeSettings}
             canEscalate={canEscalate}
+            aiChatAvailable={aiChatAvailable}
             onCreateSupportTicket={() => setView("escalate")}
             onClose={() => setOpen(false)}
           />
@@ -1616,13 +1636,14 @@ export default function ChatWidget({
             messagesEndRef={messagesEndRef as unknown as React.RefObject<HTMLDivElement>}
             themeSettings={themeSettings}
             canEscalate={canEscalate}
+            aiChatAvailable={aiChatAvailable}
             onContactSupport={() => setView("escalate")}
             apiBaseUrl={apiBase}
             onClose={() => setOpen(false)}
           />
         ) : null}
 
-        {view === "escalate" && (
+        {view === "escalate" && agentAvailable ? (
           <EscalateScreen
             styles={styles as unknown as Record<string, React.CSSProperties>}
             themeSettings={themeSettings}
@@ -1639,7 +1660,7 @@ export default function ChatWidget({
             initialSummary={lastUserMessageForEscalate(messages)}
             onClose={() => setOpen(false)}
           />
-        )}
+        ) : null}
       </div>
     </>
   );
