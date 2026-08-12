@@ -19,3 +19,16 @@ export function widgetHeaderSubFontSize(fontSizeBase?: number): number {
 export function widgetWelcomeHeadlineSize(fontSizeBase?: number): number {
   return fontSizeBase ?? 28;
 }
+
+/**
+ * Pre-chat name/email screen — keep headline close to form text
+ * (base/2 was too small for the greeting; full base was too loud).
+ */
+export function widgetPrechatHeadlineSize(fontSizeBase?: number): number {
+  return widgetFormFontSize(fontSizeBase) + 3;
+}
+
+/** Pre-chat subtitle under the welcome line — near form size. */
+export function widgetPrechatSubtitleSize(fontSizeBase?: number): number {
+  return Math.max(14, widgetFormFontSize(fontSizeBase) - 1);
+}

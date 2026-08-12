@@ -384,6 +384,12 @@ function widgetHeaderSubFontSize(fontSizeBase) {
 function widgetWelcomeHeadlineSize(fontSizeBase) {
   return fontSizeBase ?? 28;
 }
+function widgetPrechatHeadlineSize(fontSizeBase) {
+  return widgetFormFontSize(fontSizeBase) + 3;
+}
+function widgetPrechatSubtitleSize(fontSizeBase) {
+  return Math.max(14, widgetFormFontSize(fontSizeBase) - 1);
+}
 
 // src/components/LinkifiedText.tsx
 import { Fragment } from "react";
@@ -1629,10 +1635,10 @@ function PreChatScreen({
   const [email, setEmail] = useState2("");
   const [localError, setLocalError] = useState2(null);
   const { headline, subtitle } = resolveWelcomeCopy(themeSettings, { preChat: true });
-  const headerFontSize = themeSettings?.fontSizeBase ?? 28;
-  const bodyFontSize = headerFontSize / 2;
+  const headerFontSize = widgetPrechatHeadlineSize(themeSettings?.fontSizeBase);
+  const bodyFontSize = widgetPrechatSubtitleSize(themeSettings?.fontSizeBase);
   const shownError = localError || error || null;
-  return /* @__PURE__ */ jsxs10("div", { style: styles.welcomeScreen, children: [
+  return /* @__PURE__ */ jsxs10("div", { style: styles.welcomeScreen, className: "chat-widget-prechat", children: [
     /* @__PURE__ */ jsx13("div", { style: styles.welcomeHeader, className: "chat-widget-welcome-header", children: /* @__PURE__ */ jsxs10(
       "div",
       {
@@ -1652,7 +1658,8 @@ function PreChatScreen({
                   margin: 0,
                   fontSize: headerFontSize,
                   fontWeight: 700,
-                  marginBottom: 8
+                  marginBottom: 6,
+                  lineHeight: 1.3
                 },
                 children: headline
               }
@@ -4035,6 +4042,15 @@ function ChatWidget({
           }
           .chat-widget-welcome-header p {
             font-size: clamp(0.8125rem, 3.5vw, 0.9375rem) !important;
+            line-height: 1.5 !important;
+          }
+          /* Pre-chat: keep welcome / greeting / fields in a tight scale */
+          .chat-widget-prechat .chat-widget-welcome-header h2 {
+            font-size: clamp(1.0625rem, 3.8vw, 1.1875rem) !important;
+            line-height: 1.3 !important;
+          }
+          .chat-widget-prechat .chat-widget-welcome-header p {
+            font-size: clamp(0.875rem, 3.4vw, 0.9375rem) !important;
             line-height: 1.5 !important;
           }
           .chat-widget-prechat-body {

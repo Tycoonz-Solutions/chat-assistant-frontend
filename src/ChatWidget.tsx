@@ -1501,6 +1501,15 @@ export default function ChatWidget({
             font-size: clamp(0.8125rem, 3.5vw, 0.9375rem) !important;
             line-height: 1.5 !important;
           }
+          /* Pre-chat: keep welcome / greeting / fields in a tight scale */
+          .chat-widget-prechat .chat-widget-welcome-header h2 {
+            font-size: clamp(1.0625rem, 3.8vw, 1.1875rem) !important;
+            line-height: 1.3 !important;
+          }
+          .chat-widget-prechat .chat-widget-welcome-header p {
+            font-size: clamp(0.875rem, 3.4vw, 0.9375rem) !important;
+            line-height: 1.5 !important;
+          }
           .chat-widget-prechat-body {
             padding: 0 16px 20px !important;
           }

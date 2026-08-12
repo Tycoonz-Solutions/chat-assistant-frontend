@@ -7,6 +7,10 @@ import {
   REQUIRED_EMAIL_MESSAGE,
   isValidEmail,
 } from "../lib/email";
+import {
+  widgetPrechatHeadlineSize,
+  widgetPrechatSubtitleSize,
+} from "../lib/widget-font-size";
 
 export default function PreChatScreen({
   styles,
@@ -27,12 +31,12 @@ export default function PreChatScreen({
   const [email, setEmail] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
   const { headline, subtitle } = resolveWelcomeCopy(themeSettings, { preChat: true });
-  const headerFontSize = themeSettings?.fontSizeBase ?? 28;
-  const bodyFontSize = headerFontSize / 2;
+  const headerFontSize = widgetPrechatHeadlineSize(themeSettings?.fontSizeBase);
+  const bodyFontSize = widgetPrechatSubtitleSize(themeSettings?.fontSizeBase);
   const shownError = localError || error || null;
 
   return (
-    <div style={styles.welcomeScreen}>
+    <div style={styles.welcomeScreen} className="chat-widget-prechat">
       <div style={styles.welcomeHeader} className="chat-widget-welcome-header">
         <div
           style={{
@@ -49,7 +53,8 @@ export default function PreChatScreen({
                 margin: 0,
                 fontSize: headerFontSize,
                 fontWeight: 700,
-                marginBottom: 8,
+                marginBottom: 6,
+                lineHeight: 1.3,
               }}
             >
               {headline}
